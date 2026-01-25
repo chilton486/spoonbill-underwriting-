@@ -1,0 +1,505 @@
+/* Custom styles for Battleship game */
+
+:root {
+    --cell-size: clamp(26px, 3.6vw, 40px);
+}
+
+.cell.enemy-ship {
+    background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 52%, #475569 100%);
+    border-color: rgba(226, 232, 240, 0.55);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.cell.enemy-ship.ship-seg {
+    outline: 1px solid rgba(15, 23, 42, 0.25);
+    outline-offset: -2px;
+}
+
+.cell.enemy-ship.ship-single {
+    border-radius: 10px;
+}
+
+.cell.enemy-ship.ship-h.ship-head {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.cell.enemy-ship.ship-h.ship-tail {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.cell.enemy-ship.ship-v.ship-head {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.cell.enemy-ship.ship-v.ship-tail {
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+.cell.enemy-ship.ship-h::after,
+.cell.enemy-ship.ship-v::after {
+    content: '';
+    position: absolute;
+    opacity: 0.55;
+    border-radius: 999px;
+}
+
+.cell.enemy-ship.ship-h::after {
+    left: 6px;
+    right: 6px;
+    height: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(226, 232, 240, 0.60) 0 2px,
+        rgba(15, 23, 42, 0) 2px 7px
+    );
+}
+
+.cell.enemy-ship.ship-v::after {
+    top: 6px;
+    bottom: 6px;
+    width: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(226, 232, 240, 0.60) 0 2px,
+        rgba(15, 23, 42, 0) 2px 7px
+    );
+}
+
+.cell.enemy-ship.player-hit {
+    background:
+        radial-gradient(10px 10px at 50% 45%, rgba(239, 68, 68, 0.55), rgba(239, 68, 68, 0) 65%),
+        linear-gradient(180deg, #cbd5e1 0%, #94a3b8 52%, #475569 100%);
+    border-color: rgba(190, 18, 60, 0.85);
+}
+
+.board {
+    width: fit-content;
+    user-select: none;
+}
+
+.cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border: 1px solid #1e40af;
+    background-color: #0b2a6f;
+    cursor: pointer;
+    transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+    position: relative;
+    outline: none;
+}
+
+.cell:focus-visible {
+    box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.9);
+    transform: translateZ(0) scale(1.03);
+}
+
+.cell.player-water {
+    background:
+        radial-gradient(10px 10px at 25% 30%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 65%),
+        radial-gradient(14px 14px at 70% 75%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 70%),
+        linear-gradient(180deg, rgba(59, 130, 246, 0.30), rgba(2, 6, 23, 0.08)),
+        linear-gradient(135deg, #08306b, #0b2a6f 55%, #062455);
+}
+
+.cell.ai-water {
+    background:
+        radial-gradient(10px 10px at 20% 70%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 65%),
+        radial-gradient(14px 14px at 80% 25%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 70%),
+        linear-gradient(180deg, rgba(14, 165, 233, 0.22), rgba(2, 6, 23, 0.10)),
+        linear-gradient(135deg, #062a57, #0a2f5c 55%, #04203f);
+}
+
+.cell.player-water::before,
+.cell.ai-water::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.45;
+    will-change: transform;
+    background: linear-gradient(
+        120deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.14) 45%,
+        rgba(255, 255, 255, 0) 75%
+    );
+    transform: translateX(-60%);
+    animation: water-shimmer 3.2s ease-in-out infinite;
+}
+
+@keyframes water-shimmer {
+    0% { transform: translateX(-70%); }
+    50% { transform: translateX(20%); }
+    100% { transform: translateX(80%); }
+}
+
+.cell.player-ship {
+    background: linear-gradient(180deg, #9ca3af 0%, #6b7280 55%, #374151 100%);
+    border-color: rgba(226, 232, 240, 0.55);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.cell.player-ship.ship-seg {
+    outline: 1px solid rgba(15, 23, 42, 0.25);
+    outline-offset: -2px;
+}
+
+.cell.player-ship.ship-single {
+    border-radius: 10px;
+}
+
+.cell.player-ship.ship-h.ship-head {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.cell.player-ship.ship-h.ship-tail {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.cell.player-ship.ship-v.ship-head {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.cell.player-ship.ship-v.ship-tail {
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+.cell.player-ship.ship-h.ship-mid,
+.cell.player-ship.ship-v.ship-mid,
+.cell.enemy-ship.ship-h.ship-mid,
+.cell.enemy-ship.ship-v.ship-mid {
+    border-radius: 6px;
+}
+
+.cell.player-ship.ship-h::after,
+.cell.player-ship.ship-v::after {
+    content: '';
+    position: absolute;
+    opacity: 0.55;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.35);
+}
+
+.cell.player-ship.ship-h::after {
+    left: 6px;
+    right: 6px;
+    height: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(226, 232, 240, 0.55) 0 2px,
+        rgba(15, 23, 42, 0) 2px 7px
+    );
+}
+
+.cell.player-ship.ship-v::after {
+    top: 6px;
+    bottom: 6px;
+    width: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(226, 232, 240, 0.55) 0 2px,
+        rgba(15, 23, 42, 0) 2px 7px
+    );
+}
+
+.cell.ai-clickable:hover {
+    background-color: #1d4ed8;
+    border-color: #60a5fa;
+    transform: scale(1.04);
+}
+
+.cell.disabled,
+.cell.disabled:hover {
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.6;
+}
+
+.cell.hit {
+    background-color: #ef4444;
+    border-color: #991b1b;
+    animation: hit-pop 240ms ease;
+}
+
+.cell.player-hit {
+    background-color: #fb7185;
+    border-color: #be123c;
+    animation: hit-pop 240ms ease;
+}
+
+.cell.ai-hit {
+    background-color: #f97316;
+    border-color: #9a3412;
+    animation: hit-pop 240ms ease;
+}
+
+.cell.miss {
+    background:
+        linear-gradient(180deg, rgba(96, 165, 250, 0.65), rgba(37, 99, 235, 0.45));
+    border-color: rgba(255, 255, 255, 0.65);
+    box-shadow: 0 0 0 2px rgba(2, 6, 23, 0.35) inset, 0 0 10px rgba(59, 130, 246, 0.55);
+    animation: miss-pop 200ms ease;
+}
+
+.cell.miss::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.95) 0 18%, rgba(255, 255, 255, 0) 19% 100%);
+    filter: drop-shadow(0 1px 1px rgba(2, 6, 23, 0.35));
+}
+
+.cell.sunk {
+    background:
+        repeating-linear-gradient(45deg, rgba(2, 6, 23, 0.35) 0 6px, rgba(2, 6, 23, 0.15) 6px 12px),
+        linear-gradient(180deg, #7f1d1d, #450a0a);
+    border-color: rgba(255, 255, 255, 0.45);
+    box-shadow: 0 0 0 2px rgba(2, 6, 23, 0.45) inset, 0 0 14px rgba(239, 68, 68, 0.45);
+    animation: sunk-pulse 420ms ease;
+}
+
+.cell.sunk::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    pointer-events: none;
+    background:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.85) 0 2px, rgba(255, 255, 255, 0) 2px 100%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.85) 0 2px, rgba(255, 255, 255, 0) 2px 100%);
+    opacity: 0.85;
+}
+
+.cell.preview {
+    background-color: #10b981;
+    opacity: 0.6;
+    border-color: #059669;
+}
+
+.cell.invalid {
+    background-color: #ef4444;
+    opacity: 0.6;
+    border-color: #dc2626;
+}
+
+@keyframes hit-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+}
+
+@keyframes miss-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+    100% { transform: scale(1); }
+}
+
+@keyframes sunk-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.14); }
+    100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cell.player-water::before,
+    .cell.ai-water::before {
+        animation: none;
+    }
+
+    .cell.hit,
+    .cell.player-hit,
+    .cell.ai-hit,
+    .cell.miss,
+    .cell.sunk,
+    .victory,
+    .defeat {
+        animation: none;
+    }
+}
+
+.ship-selector {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.ship-piece {
+    background-color: #6b7280;
+    border: 2px solid #4b5563;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.ship-piece[draggable="true"] {
+    cursor: grab;
+}
+
+.ship-piece[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.health-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.health-label {
+    width: 110px;
+    font-size: 12px;
+    color: rgba(219, 234, 254, 0.95);
+}
+
+.health-bar {
+    flex: 1;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(30, 64, 175, 0.45);
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    overflow: hidden;
+}
+
+.health-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 220ms ease;
+}
+
+.health-fill.player {
+    background: linear-gradient(90deg, #34d399, #10b981);
+}
+
+.health-fill.computer {
+    background: linear-gradient(90deg, #fb7185, #ef4444);
+}
+
+.health-text {
+    width: 48px;
+    text-align: right;
+    font-size: 12px;
+    color: rgba(219, 234, 254, 0.95);
+}
+
+.move-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.move-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(30, 64, 175, 0.35);
+    border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.move-badge.hit {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.45);
+}
+
+.move-badge.miss {
+    background: rgba(96, 165, 250, 0.25);
+    border-color: rgba(96, 165, 250, 0.45);
+}
+
+.ship-piece:hover {
+    transform: scale(1.05);
+    background-color: #9ca3af;
+}
+
+.ship-piece.selected {
+    background-color: #059669;
+    border-color: #047857;
+}
+
+.ship-piece.horizontal {
+    width: 40px;
+    height: 40px;
+}
+
+.ship-piece.vertical {
+    width: 40px;
+    height: 40px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    h1 {
+        font-size: 2.5rem;
+    }
+}
+
+/* Game state animations */
+.game-over {
+    animation: game-over-pulse 2s ease-in-out infinite;
+}
+
+@keyframes game-over-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.victory {
+    background: linear-gradient(45deg, #10b981, #059669);
+    animation: victory-celebration 1s ease;
+}
+
+@keyframes victory-celebration {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.defeat {
+    background: linear-gradient(45deg, #dc2626, #991b1b);
+    animation: defeat-shake 0.5s ease;
+}
+
+@keyframes defeat-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
