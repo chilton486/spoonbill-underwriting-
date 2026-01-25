@@ -21,7 +21,9 @@ def fund_claim_atomic(*, session: Session, pool_id: str, claim_id: str, funded_a
     claim = session.exec(select(Claim).where(Claim.claim_id == claim_id)).one()
     practice = session.exec(select(Practice).where(Practice.id == claim.practice_id)).one()
 
-    if claim.status != ClaimStatus.submitted:
+    # Allow funding from either submitted or underwriting status
+    # (underwriting is the intermediate state after initial review)
+    if claim.status not in (ClaimStatus.submitted, ClaimStatus.underwriting):
         raise LedgerError(f"Claim {claim.claim_id} not fundable from status={claim.status}")
 
     remaining = get_remaining_practice_exposure_limit(practice=practice)

@@ -70,3 +70,10 @@ export async function settleClaim(claimId, { poolId = 'POOL', settlementDate, se
     })
   })
 }
+
+export async function resetDemo({ poolId = 'POOL' } = {}) {
+  return request('/reset', {
+    method: 'POST',
+    body: JSON.stringify({ pool_id: poolId })
+  })
+}
