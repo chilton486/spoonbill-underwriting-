@@ -14,6 +14,7 @@ import {
   getCapitalPool,
   getClaims,
   getPractices,
+  resetDemo,
   settleClaim,
   simulate,
   underwriteClaim
@@ -37,6 +38,10 @@ export default function App() {
   const [loading, setLoading] = React.useState(true)
   const [selectedClaim, setSelectedClaim] = React.useState(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
+  const [loadingClaimId, setLoadingClaimId] = React.useState(null)
+  const [recentlyAdvanced, setRecentlyAdvanced] = React.useState(null)
+  const [simulating, setSimulating] = React.useState(false)
+  const [resetting, setResetting] = React.useState(false)
 
   const practicesById = React.useMemo(() => toPracticeMap(practices), [practices])
 
@@ -82,16 +87,33 @@ export default function App() {
   async function runSimulationStep() {
     try {
       setError(null)
+      setSimulating(true)
       await simulate({ poolId: 'POOL', seedIfEmpty: true, advanceOneStep: true })
       await refresh()
     } catch (e) {
       setError(e?.body ? JSON.stringify(e.body) : e.message)
+    } finally {
+      setSimulating(false)
+    }
+  }
+
+  async function handleResetDemo() {
+    try {
+      setError(null)
+      setResetting(true)
+      await resetDemo({ poolId: 'POOL' })
+      await refresh()
+    } catch (e) {
+      setError(e?.body ? JSON.stringify(e.body) : e.message)
+    } finally {
+      setResetting(false)
     }
   }
 
   async function advanceClaim(claim) {
     try {
       setError(null)
+      setLoadingClaimId(claim.claim_id)
       if (claim.status === 'submitted') {
         await underwriteClaim(claim.claim_id, { poolId: 'POOL' })
       } else if (claim.status === 'underwriting') {
@@ -104,9 +126,13 @@ export default function App() {
         })
       }
       await refresh()
+      setRecentlyAdvanced(claim.claim_id)
+      setTimeout(() => setRecentlyAdvanced(null), 2000)
     } catch (e) {
       setError(e?.body ? JSON.stringify(e.body) : e.message)
       await refresh().catch(() => {})
+    } finally {
+      setLoadingClaimId(null)
     }
   }
 
@@ -127,27 +153,31 @@ export default function App() {
               </Typography>
             </Stack>
 
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <Button variant="contained" onClick={runSimulationStep}>Run Simulation Step</Button>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <Button 
+                variant="contained" 
+                onClick={runSimulationStep}
+                disabled={simulating}
+                startIcon={simulating ? <CircularProgress size={16} color="inherit" /> : null}
+              >
+                {simulating ? 'Running...' : 'Run Simulation Step'}
+              </Button>
               <Button
                 variant="outlined"
-                onClick={() => refresh().catch(() => {})}
+                color="warning"
+                onClick={handleResetDemo}
+                disabled={resetting}
+                startIcon={resetting ? <CircularProgress size={16} color="inherit" /> : null}
               >
-                Refresh
+                {resetting ? 'Resetting...' : 'Reset Demo'}
               </Button>
             </Stack>
           </Stack>
 
-          {error ? <Alert severity="error">{error}</Alert> : null}
+          {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
 
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
             <Stack spacing={2} sx={{ flex: 1, minWidth: 0 }}>
-              <Paper variant="outlined" sx={{ p: 2, borderColor: 'rgba(148,163,184,0.22)' }}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(226,232,240,0.75)' }}>
-                  Backend: http://localhost:8000
-                </Typography>
-              </Paper>
-
               {loading ? (
                 <Stack sx={{ py: 8, alignItems: 'center' }} spacing={2}>
                   <CircularProgress />
@@ -159,6 +189,8 @@ export default function App() {
                   practicesById={practicesById}
                   onOpenClaim={openClaim}
                   onAdvanceClaim={advanceClaim}
+                  loadingClaimId={loadingClaimId}
+                  recentlyAdvanced={recentlyAdvanced}
                 />
               )}
             </Stack>
@@ -166,9 +198,23 @@ export default function App() {
             <Stack spacing={2} sx={{ width: { xs: '100%', lg: 340 }, flexShrink: 0 }}>
               <CapitalPoolPanel pool={pool} />
               <Paper variant="outlined" sx={{ p: 2.25, borderColor: 'rgba(148,163,184,0.22)' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.25 }}>Demo Controls</Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)' }}>
-                  Click any claim card for details. Use “Next” on a card to push it through the lifecycle.
+                <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.25 }}>How It Works</Typography>
+                <Stack spacing={1}>
+                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                    1. Practices submit dental insurance claims
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                    2. Spoonbill underwrites risk instantly
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                    3. Capital is deployed same-day to practice
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                    4. Insurer reimburses Spoonbill days later
+                  </Typography>
+                </Stack>
+                <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.5)', display: 'block', mt: 1.5 }}>
+                  Click "Next" on any claim to advance it through the lifecycle.
                 </Typography>
               </Paper>
             </Stack>

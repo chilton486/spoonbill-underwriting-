@@ -21,11 +21,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"] ,
+    allow_headers=["*"],
 )
 
 
@@ -77,6 +78,10 @@ class SimulateRequest(BaseModel):
     advance_one_step: bool = True
 
 
+class ResetDemoRequest(BaseModel):
+    pool_id: str = "POOL"
+
+
 def _default_policy() -> UnderwritingPolicy:
     return UnderwritingPolicy(
         approved_payers={"Aetna", "UnitedHealthcare", "BCBS", "Cigna"},
@@ -106,27 +111,29 @@ def init_pool(total_capital: int, pool_id: str = "POOL") -> CapitalPool:
 
 
 @app.get("/capital-pool/{pool_id}")
-def get_pool(pool_id: str) -> CapitalPool:
+def get_pool(pool_id: str) -> dict:
     with session_scope() as session:
         pool = session.exec(select(CapitalPool).where(CapitalPool.id == pool_id)).first()
         if pool is None:
             raise HTTPException(status_code=404, detail="Capital pool not found")
-        return pool
+        return pool.model_dump()
 
 
 @app.get("/claims")
-def list_claims(practice_id: Optional[str] = None) -> list[Claim]:
+def list_claims(practice_id: Optional[str] = None) -> list[dict]:
     with session_scope() as session:
         stmt = select(Claim)
         if practice_id is not None:
             stmt = stmt.where(Claim.practice_id == practice_id)
-        return session.exec(stmt).all()
+        claims = session.exec(stmt).all()
+        return [c.model_dump() for c in claims]
 
 
 @app.get("/practices")
-def list_practices() -> list[Practice]:
+def list_practices() -> list[dict]:
     with session_scope() as session:
-        return session.exec(select(Practice)).all()
+        practices = session.exec(select(Practice)).all()
+        return [p.model_dump() for p in practices]
 
 
 @app.post("/practices")
@@ -380,3 +387,132 @@ def get_state(pool_id: str = "POOL", practice_id: Optional[str] = None) -> dict:
             "practices": [p.model_dump() for p in practices],
             "claims": [c.model_dump() for c in claims],
         }
+
+
+@app.post("/reset")
+def reset_demo(req: ResetDemoRequest) -> dict:
+    """Reset demo to a clean, deterministic state.
+    
+    Clears all claims, practices, and capital pool, then seeds
+    the same demo data every time for consistent investor demos.
+    """
+    with session_scope() as session:
+        # Clear all existing data
+        session.exec(select(Claim)).all()
+        for claim in session.exec(select(Claim)).all():
+            session.delete(claim)
+        for practice in session.exec(select(Practice)).all():
+            session.delete(practice)
+        for pool in session.exec(select(CapitalPool)).all():
+            session.delete(pool)
+        session.flush()
+
+    # Seed deterministic demo data (dental-focused for Spoonbill)
+    with session_scope() as session:
+        # Create capital pool with $1M starting capital
+        pool = CapitalPool(
+            id=req.pool_id,
+            total_capital=1_000_000,
+            available_capital=1_000_000,
+            capital_allocated=0,
+            capital_pending_settlement=0,
+            capital_returned=0,
+        )
+        session.add(pool)
+
+        # Create dental practices with realistic profiles
+        session.add(
+            Practice(
+                id="Bright Smile Dental",
+                tenure_months=36,
+                historical_clean_claim_rate=0.97,
+                payer_mix="Aetna:0.35;BCBS:0.40;Cigna:0.25",
+                max_exposure_limit=75_000,
+                current_exposure=0,
+            )
+        )
+        session.add(
+            Practice(
+                id="Downtown Family Dentistry",
+                tenure_months=24,
+                historical_clean_claim_rate=0.95,
+                payer_mix="UnitedHealthcare:0.50;BCBS:0.30;Aetna:0.20",
+                max_exposure_limit=100_000,
+                current_exposure=0,
+            )
+        )
+        session.add(
+            Practice(
+                id="Coastal Orthodontics",
+                tenure_months=18,
+                historical_clean_claim_rate=0.94,
+                payer_mix="Cigna:0.45;Aetna:0.35;BCBS:0.20",
+                max_exposure_limit=120_000,
+                current_exposure=0,
+            )
+        )
+
+        # Create dental claims at various stages for demo
+        # Use fixed dates relative to "today" for determinism
+        today = date.today()
+
+        # Claims in "submitted" stage (ready to be underwritten)
+        session.add(
+            Claim(
+                claim_id="CLM-D001",
+                practice_id="Bright Smile Dental",
+                payer="Aetna",
+                procedure_code="99213",
+                billed_amount=1_850,
+                expected_allowed_amount=1_480,
+                submission_date=today,
+            )
+        )
+        session.add(
+            Claim(
+                claim_id="CLM-D002",
+                practice_id="Downtown Family Dentistry",
+                payer="UnitedHealthcare",
+                procedure_code="99214",
+                billed_amount=3_200,
+                expected_allowed_amount=2_560,
+                submission_date=today,
+            )
+        )
+        session.add(
+            Claim(
+                claim_id="CLM-D003",
+                practice_id="Coastal Orthodontics",
+                payer="Cigna",
+                procedure_code="99213",
+                billed_amount=4_500,
+                expected_allowed_amount=3_600,
+                submission_date=today,
+            )
+        )
+        session.add(
+            Claim(
+                claim_id="CLM-D004",
+                practice_id="Bright Smile Dental",
+                payer="BCBS",
+                procedure_code="93000",
+                billed_amount=2_100,
+                expected_allowed_amount=1_680,
+                submission_date=today,
+            )
+        )
+        session.add(
+            Claim(
+                claim_id="CLM-D005",
+                practice_id="Downtown Family Dentistry",
+                payer="BCBS",
+                procedure_code="99213",
+                billed_amount=1_950,
+                expected_allowed_amount=1_560,
+                submission_date=today,
+            )
+        )
+
+        session.flush()
+
+    return get_state(pool_id=req.pool_id)
