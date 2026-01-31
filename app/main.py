@@ -669,58 +669,94 @@ def simulate(req: SimulateRequest) -> dict:
         if req.seed_if_empty and len(practices) == 0:
             session.add(
                 Practice(
-                    id="Sunrise Family Medicine",
+                    id="Bright Smile Dental",
+                    npi="1234567890",
+                    tenure_months=36,
+                    historical_clean_claim_rate=0.97,
+                    payer_mix="Aetna:0.35;BCBS:0.40;Cigna:0.25",
+                    max_exposure_limit=75_000,
+                    current_exposure=0,
+                )
+            )
+            session.add(
+                Practice(
+                    id="Downtown Family Dentistry",
+                    npi="2345678901",
                     tenure_months=24,
-                    historical_clean_claim_rate=0.96,
-                    payer_mix="Aetna:0.4;UnitedHealthcare:0.3;BCBS:0.3",
+                    historical_clean_claim_rate=0.95,
+                    payer_mix="UnitedHealthcare:0.50;BCBS:0.30;Aetna:0.20",
                     max_exposure_limit=100_000,
                     current_exposure=0,
                 )
             )
             session.add(
                 Practice(
-                    id="Riverside Cardiology",
+                    id="Coastal Orthodontics",
+                    npi="3456789012",
                     tenure_months=18,
                     historical_clean_claim_rate=0.94,
-                    payer_mix="BCBS:0.6;Cigna:0.4",
-                    max_exposure_limit=150_000,
+                    payer_mix="Cigna:0.45;Aetna:0.35;BCBS:0.20",
+                    max_exposure_limit=120_000,
                     current_exposure=0,
                 )
             )
 
         claims = session.exec(select(Claim)).all()
         if req.seed_if_empty and len(claims) == 0:
+            today = date.today()
             session.add(
                 Claim(
-                    claim_id="CLM-1001",
-                    practice_id="Sunrise Family Medicine",
+                    claim_id="CLM-D001",
+                    practice_id="Bright Smile Dental",
                     payer="Aetna",
-                    procedure_code="99213",
-                    billed_amount=250,
-                    expected_allowed_amount=180,
-                    submission_date=date.today(),
+                    procedure_code="D0120",
+                    billed_amount=8_500,
+                    expected_allowed_amount=6_800,
+                    submission_date=today,
                 )
             )
             session.add(
                 Claim(
-                    claim_id="CLM-1002",
-                    practice_id="Sunrise Family Medicine",
-                    payer="UnitedHealthcare",
-                    procedure_code="99214",
-                    billed_amount=420,
-                    expected_allowed_amount=300,
-                    submission_date=date.today(),
+                    claim_id="CLM-D002",
+                    practice_id="Downtown Family Dentistry",
+                    payer="Delta Dental",
+                    procedure_code="D1110",
+                    billed_amount=12_500,
+                    expected_allowed_amount=10_000,
+                    submission_date=today,
                 )
             )
             session.add(
                 Claim(
-                    claim_id="CLM-2001",
-                    practice_id="Riverside Cardiology",
+                    claim_id="CLM-D003",
+                    practice_id="Coastal Orthodontics",
+                    payer="Cigna",
+                    procedure_code="D2391",
+                    billed_amount=22_500,
+                    expected_allowed_amount=18_000,
+                    submission_date=today,
+                )
+            )
+            session.add(
+                Claim(
+                    claim_id="CLM-D004",
+                    practice_id="Bright Smile Dental",
                     payer="BCBS",
-                    procedure_code="93000",
-                    billed_amount=560,
-                    expected_allowed_amount=400,
-                    submission_date=date.today(),
+                    procedure_code="D0274",
+                    billed_amount=7_500,
+                    expected_allowed_amount=6_000,
+                    submission_date=today,
+                )
+            )
+            session.add(
+                Claim(
+                    claim_id="CLM-D005",
+                    practice_id="Downtown Family Dentistry",
+                    payer="UnitedHealthcare",
+                    procedure_code="D2750",
+                    billed_amount=150_000,
+                    expected_allowed_amount=120_000,
+                    submission_date=today,
                 )
             )
 

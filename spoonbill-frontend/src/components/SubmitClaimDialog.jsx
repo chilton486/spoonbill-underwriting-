@@ -21,7 +21,7 @@ export default function SubmitClaimDialog({ open, onClose, practices, onSubmit }
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState(null)
 
-  const payers = ['Aetna', 'UnitedHealthcare', 'BCBS', 'Cigna']
+  const payers = ['Aetna', 'UnitedHealthcare', 'BCBS', 'Cigna', 'Delta Dental']
 
   React.useEffect(() => {
     if (open) {

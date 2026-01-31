@@ -207,7 +207,7 @@ export default function App() {
           {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
 
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
-            <Stack spacing={2} sx={{ flex: 1, minWidth: 0 }}>
+            <Stack spacing={2} sx={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
               {loading ? (
                 <Stack sx={{ py: 8, alignItems: 'center' }} spacing={2}>
                   <CircularProgress />
@@ -225,7 +225,7 @@ export default function App() {
               )}
             </Stack>
 
-            <Stack spacing={2} sx={{ width: { xs: '100%', lg: 340 }, flexShrink: 0 }}>
+            <Stack spacing={2} sx={{ width: { xs: '100%', lg: 300 }, flexShrink: 0 }}>
               <CapitalPoolPanel pool={pool} />
               <Paper variant="outlined" sx={{ p: 2.25, borderColor: 'rgba(148,163,184,0.22)' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.25 }}>How It Works</Typography>
