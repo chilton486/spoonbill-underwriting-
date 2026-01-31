@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Optional
 
@@ -21,6 +22,7 @@ from .models import (
 )
 from .underwriting import UnderwritingPolicy, underwrite_claim
 
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Spoonbill Underwriting & Capital Allocation (V1)")
 
@@ -127,6 +129,89 @@ def get_pool(pool_id: str) -> dict:
         return pool.model_dump()
 
 
+@app.get("/health/capital")
+def health_capital(pool_id: str = "POOL") -> dict:
+    with session_scope() as session:
+        pool = session.exec(select(CapitalPool).where(CapitalPool.id == pool_id)).first()
+        if pool is None:
+            return {
+                "status": "error",
+                "pool_id": pool_id,
+                "message": "Capital pool not found",
+                "invariants_ok": False,
+            }
+
+        issues: list[str] = []
+
+        if pool.available_capital < 0:
+            issues.append(f"available_capital is negative: {pool.available_capital}")
+        if pool.capital_allocated < 0:
+            issues.append(f"capital_allocated is negative: {pool.capital_allocated}")
+        if pool.capital_pending_settlement < 0:
+            issues.append(f"capital_pending_settlement is negative: {pool.capital_pending_settlement}")
+        if pool.capital_returned < 0:
+            issues.append(f"capital_returned is negative: {pool.capital_returned}")
+
+        expected_available = pool.total_capital - pool.capital_allocated + pool.capital_returned
+        if pool.available_capital != expected_available:
+            issues.append(
+                f"available_capital ({pool.available_capital}) != "
+                f"total_capital ({pool.total_capital}) - capital_allocated ({pool.capital_allocated}) + "
+                f"capital_returned ({pool.capital_returned}) = {expected_available}"
+            )
+
+        if pool.capital_pending_settlement > pool.capital_allocated:
+            issues.append(
+                f"capital_pending_settlement ({pool.capital_pending_settlement}) > "
+                f"capital_allocated ({pool.capital_allocated})"
+            )
+
+        funded_claims = session.exec(
+            select(Claim).where(Claim.status == ClaimStatus.funded)
+        ).all()
+        total_funded = sum(c.funded_amount for c in funded_claims)
+        if total_funded != pool.capital_pending_settlement:
+            issues.append(
+                f"sum of funded claims ({total_funded}) != "
+                f"capital_pending_settlement ({pool.capital_pending_settlement})"
+            )
+
+        practices = session.exec(select(Practice)).all()
+        total_exposure = sum(p.current_exposure for p in practices)
+        if total_exposure != pool.capital_allocated:
+            issues.append(
+                f"sum of practice exposures ({total_exposure}) != "
+                f"capital_allocated ({pool.capital_allocated})"
+            )
+
+        invariants_ok = len(issues) == 0
+        utilization_pct = (
+            (pool.capital_allocated / pool.total_capital * 100)
+            if pool.total_capital > 0 else 0.0
+        )
+
+        return {
+            "status": "healthy" if invariants_ok else "unhealthy",
+            "pool_id": pool_id,
+            "invariants_ok": invariants_ok,
+            "issues": issues if issues else None,
+            "metrics": {
+                "total_capital": pool.total_capital,
+                "available_capital": pool.available_capital,
+                "capital_allocated": pool.capital_allocated,
+                "capital_pending_settlement": pool.capital_pending_settlement,
+                "capital_returned": pool.capital_returned,
+                "utilization_pct": round(utilization_pct, 2),
+                "num_funded_claims": len(funded_claims),
+                "num_settled_claims": pool.num_settled_claims,
+                "avg_days_outstanding": (
+                    round(pool.total_days_outstanding / pool.num_settled_claims, 1)
+                    if pool.num_settled_claims > 0 else None
+                ),
+            },
+        }
+
+
 @app.get("/claims")
 def list_claims(practice_id: Optional[str] = None) -> list[dict]:
     with session_scope() as session:
@@ -197,14 +282,21 @@ def create_claim(req: CreateClaimRequest) -> Claim:
 
 @app.post("/claims/{claim_id}/underwrite")
 def underwrite(claim_id: str, req: UnderwriteRequest) -> dict:
+    logger.info("Underwriting claim: claim_id=%s, pool_id=%s", claim_id, req.pool_id)
+
     with session_scope() as session:
         claim = session.exec(select(Claim).where(Claim.claim_id == claim_id)).first()
         if claim is None:
+            logger.warning("Claim not found: claim_id=%s", claim_id)
             raise HTTPException(status_code=404, detail="Claim not found")
 
         try:
             validate_status_transition(claim.status, ClaimStatus.underwriting)
         except InvalidStatusTransitionError as e:
+            logger.warning(
+                "Invalid status transition for underwrite: claim_id=%s, current_status=%s",
+                claim_id, claim.status.value
+            )
             raise HTTPException(status_code=400, detail=e.message)
 
         practice = session.exec(select(Practice).where(Practice.id == claim.practice_id)).one()
@@ -223,9 +315,17 @@ def underwrite(claim_id: str, req: UnderwriteRequest) -> dict:
             claim.decline_reason_code = decision.reason_code
             claim.status = ClaimStatus.exception
             session.add(claim)
+            logger.info(
+                "Claim declined: claim_id=%s, reason_code=%s",
+                claim_id, decision.reason_code
+            )
         else:
             claim.status = ClaimStatus.underwriting
             session.add(claim)
+            logger.info(
+                "Claim approved for underwriting: claim_id=%s, funded_amount=%d",
+                claim_id, decision.funded_amount
+            )
 
         return {
             "approved": decision.approved,
