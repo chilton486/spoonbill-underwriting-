@@ -93,6 +93,8 @@ This ensures consistent, reproducible demos for investor presentations.
 
 ## Development Notes
 
+This project uses Python 3.10+ and Node.js 18+ for development.
+
 The demo prioritizes clarity over production-readiness:
 - SQLite for simplicity (no Postgres setup required)
 - In-memory state resets on server restart
