@@ -164,7 +164,7 @@ export default function App() {
           <Stack direction={{ xs: 'column', md: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { md: 'center' }, gap: 2 }}>
             <Stack spacing={0.5}>
               <Typography variant="h4" sx={{ fontWeight: 900 }}>Spoonbill Claims Lifecycle</Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)' }}>
+              <Typography variant="body2" sx={{ color: '#6b7280' }}>
                 Deterministic underwriting + atomic capital allocation (demo UI)
               </Typography>
             </Stack>
@@ -172,14 +172,12 @@ export default function App() {
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
                 variant="contained"
-                color="success"
                 onClick={() => setSubmitClaimOpen(true)}
               >
                 Submit Claim
               </Button>
               <Button
-                variant="contained"
-                color="secondary"
+                variant="outlined"
                 onClick={() => setAdjudicationOpen(true)}
               >
                 Simulate Adjudication
@@ -194,7 +192,6 @@ export default function App() {
               </Button>
               <Button
                 variant="outlined"
-                color="warning"
                 onClick={handleResetDemo}
                 disabled={resetting}
                 startIcon={resetting ? <CircularProgress size={16} color="inherit" /> : null}
@@ -211,7 +208,7 @@ export default function App() {
               {loading ? (
                 <Stack sx={{ py: 8, alignItems: 'center' }} spacing={2}>
                   <CircularProgress />
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)' }}>Loading demo data…</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>Loading demo data…</Typography>
                 </Stack>
               ) : (
                 <KanbanBoard
@@ -227,23 +224,23 @@ export default function App() {
 
             <Stack spacing={2} sx={{ width: { xs: '100%', lg: 300 }, flexShrink: 0 }}>
               <CapitalPoolPanel pool={pool} />
-              <Paper variant="outlined" sx={{ p: 2.25, borderColor: 'rgba(148,163,184,0.22)' }}>
+              <Paper variant="outlined" sx={{ p: 2.25, borderColor: '#e5e7eb' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.25 }}>How It Works</Typography>
                 <Stack spacing={1}>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                  <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.8rem' }}>
                     1. Practices submit dental insurance claims
                   </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                  <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.8rem' }}>
                     2. Spoonbill underwrites risk instantly
                   </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                  <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.8rem' }}>
                     3. Capital is deployed same-day to practice
                   </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
+                  <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.8rem' }}>
                     4. Insurer reimburses Spoonbill days later
                   </Typography>
                 </Stack>
-                <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.5)', display: 'block', mt: 1.5 }}>
+                <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mt: 1.5 }}>
                   Click "Next" on any claim to advance it through the lifecycle.
                 </Typography>
               </Paper>

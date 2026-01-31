@@ -14,12 +14,12 @@ function formatMoney(value) {
 function MetricRow({ label, value, color, tooltip, highlight }) {
   const content = (
     <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 2, py: 0.5 }}>
-      <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.75)', fontSize: '0.85rem' }}>{label}</Typography>
+      <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.85rem' }}>{label}</Typography>
       <Typography 
         variant="body2" 
         sx={{ 
           fontWeight: 700, 
-          color: highlight ? color : 'inherit',
+          color: '#1a1a1a',
           fontSize: '0.85rem'
         }}
       >
@@ -43,8 +43,8 @@ function CapitalBar({ total, available, deployed, pending }) {
 
   return (
     <Stack spacing={1}>
-      <Box sx={{ position: 'relative', height: 24, borderRadius: 1, overflow: 'hidden', backgroundColor: 'rgba(100,116,139,0.2)' }}>
-        {/* Available capital (green) */}
+      <Box sx={{ position: 'relative', height: 24, borderRadius: 1, overflow: 'hidden', backgroundColor: '#e5e7eb' }}>
+        {/* Available capital (dark) */}
         <Box
           sx={{
             position: 'absolute',
@@ -52,11 +52,11 @@ function CapitalBar({ total, available, deployed, pending }) {
             top: 0,
             height: '100%',
             width: `${availablePercent}%`,
-            backgroundColor: '#34d399',
+            backgroundColor: '#1a1a1a',
             transition: 'width 0.5s ease'
           }}
         />
-        {/* Deployed/Pending capital (orange) */}
+        {/* Deployed/Pending capital (gray) */}
         <Box
           sx={{
             position: 'absolute',
@@ -64,19 +64,19 @@ function CapitalBar({ total, available, deployed, pending }) {
             top: 0,
             height: '100%',
             width: `${deployedPercent}%`,
-            backgroundColor: '#fb923c',
+            backgroundColor: '#9ca3af',
             transition: 'all 0.5s ease'
           }}
         />
       </Box>
       <Stack direction="row" spacing={2} sx={{ justifyContent: 'center' }}>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-          <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#34d399' }} />
-          <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.7rem' }}>Available</Typography>
+          <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#1a1a1a' }} />
+          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Available</Typography>
         </Stack>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-          <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#fb923c' }} />
-          <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.7rem' }}>Deployed</Typography>
+          <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#9ca3af' }} />
+          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Deployed</Typography>
         </Stack>
       </Stack>
     </Stack>
@@ -89,16 +89,16 @@ export default function CapitalPoolPanel({ pool }) {
     : 0
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.25, borderColor: 'rgba(148,163,184,0.22)' }}>
+    <Paper variant="outlined" sx={{ p: 2.25, borderColor: '#e5e7eb' }}>
       <Stack spacing={2}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem' }}>Capital Pool</Typography>
           <Typography 
             variant="caption" 
             sx={{ 
-              color: utilizationRate > 50 ? '#fb923c' : '#34d399',
+              color: '#1a1a1a',
               fontWeight: 700,
-              backgroundColor: utilizationRate > 50 ? 'rgba(251,146,60,0.15)' : 'rgba(52,211,153,0.15)',
+              backgroundColor: '#f3f4f6',
               px: 1,
               py: 0.25,
               borderRadius: 1
@@ -115,7 +115,7 @@ export default function CapitalPoolPanel({ pool }) {
           pending={pool?.capital_pending_settlement}
         />
 
-        <Divider sx={{ borderColor: 'rgba(148,163,184,0.18)' }} />
+        <Divider sx={{ borderColor: '#e5e7eb' }} />
 
         <Stack spacing={0.5}>
           <MetricRow 
@@ -146,22 +146,22 @@ export default function CapitalPoolPanel({ pool }) {
           />
         </Stack>
 
-        <Divider sx={{ borderColor: 'rgba(148,163,184,0.18)' }} />
+        <Divider sx={{ borderColor: '#e5e7eb' }} />
 
         <Stack spacing={0.5}>
-          <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
+          <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Lifetime Metrics
           </Typography>
           <MetricRow 
             label="Capital Returned" 
             value={pool?.capital_returned}
-            color="#a78bfa"
+            color="#1a1a1a"
             highlight
             tooltip="Total capital successfully returned from reimbursements"
           />
           {pool?.num_settled_claims > 0 && (
             <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 2, py: 0.5 }}>
-              <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.75)', fontSize: '0.85rem' }}>Claims Settled</Typography>
+              <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.85rem' }}>Claims Settled</Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{pool.num_settled_claims}</Typography>
             </Stack>
           )}

@@ -10,12 +10,12 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 
 const STAGES = [
-  { key: 'submitted', title: 'Claim Submitted', color: '#60a5fa', description: 'Awaiting review' },
-  { key: 'adjudicated', title: 'Adjudicated', color: '#22d3ee', description: 'Payer approved' },
-  { key: 'underwriting', title: 'Underwriting', color: '#fb923c', description: 'Risk assessment' },
-  { key: 'funded', title: 'Funded', color: '#34d399', description: 'Capital deployed' },
-  { key: 'reimbursed', title: 'Reimbursed', color: '#a78bfa', description: 'Capital returned' },
-  { key: 'exception', title: 'Exception', color: '#f87171', description: 'Requires attention' }
+  { key: 'submitted', title: 'Claim Submitted', color: '#9ca3af', description: 'Awaiting review' },
+  { key: 'adjudicated', title: 'Adjudicated', color: '#6b7280', description: 'Payer approved' },
+  { key: 'underwriting', title: 'Underwriting', color: '#4b5563', description: 'Risk assessment' },
+  { key: 'funded', title: 'Funded', color: '#1a1a1a', description: 'Capital deployed' },
+  { key: 'reimbursed', title: 'Reimbursed', color: '#374151', description: 'Capital returned' },
+  { key: 'exception', title: 'Exception', color: '#6b7280', description: 'Requires attention' }
 ]
 
 function formatMoney(value) {
@@ -40,13 +40,13 @@ function ClaimCard({ claim, practiceName, onOpen, onQuickAction, isLoading, just
       variant="outlined"
       sx={{
         p: 1.5,
-        borderColor: justAdvanced ? '#34d399' : 'rgba(148,163,184,0.22)',
-        background: justAdvanced ? 'rgba(52,211,153,0.1)' : 'rgba(15,23,42,0.8)',
+        borderColor: justAdvanced ? '#1a1a1a' : '#e5e7eb',
+        background: justAdvanced ? '#f9fafb' : '#ffffff',
         cursor: 'pointer',
-        transition: 'all 0.3s ease',
+        transition: 'all 0.2s ease',
         '&:hover': {
-          borderColor: 'rgba(148,163,184,0.4)',
-          transform: 'translateY(-1px)'
+          borderColor: '#9ca3af',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }
       }}
       onClick={() => onOpen(claim)}
@@ -58,14 +58,14 @@ function ClaimCard({ claim, practiceName, onOpen, onQuickAction, isLoading, just
             size="small" 
             label={claim.status}
             sx={{
-              backgroundColor: STAGES.find(s => s.key === claim.status)?.color || '#64748b',
-              color: '#0b1220',
-              fontWeight: 700
+              backgroundColor: STAGES.find(s => s.key === claim.status)?.color || '#6b7280',
+              color: '#ffffff',
+              fontWeight: 600
             }}
           />
         </Stack>
 
-        <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.75)' }}>
+        <Typography variant="body2" sx={{ color: '#6b7280' }}>
           {practiceName}
         </Typography>
 
@@ -75,7 +75,7 @@ function ClaimCard({ claim, practiceName, onOpen, onQuickAction, isLoading, just
               {formatMoney(claim.expected_allowed_amount)}
             </Typography>
             {isFunded && (
-              <Typography variant="caption" sx={{ color: '#fb923c', fontWeight: 600 }}>
+              <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>
                 {daysOut} day{daysOut !== 1 ? 's' : ''} outstanding
               </Typography>
             )}
@@ -100,7 +100,7 @@ function ClaimCard({ claim, practiceName, onOpen, onQuickAction, isLoading, just
             </Button>
           )}
           {justAdvanced && (
-            <CheckCircleIcon sx={{ color: '#34d399', fontSize: 20 }} />
+            <CheckCircleIcon sx={{ color: '#1a1a1a', fontSize: 20 }} />
           )}
         </Stack>
       </Stack>
@@ -140,8 +140,8 @@ export default function KanbanBoard({ claims, practicesById, onOpenClaim, onAdva
             sx={{
               flex: 1,
               minWidth: 200,
-              borderColor: 'rgba(148,163,184,0.22)',
-              background: 'rgba(2,6,23,0.35)'
+              borderColor: '#e5e7eb',
+              background: '#fafafa'
             }}
           >
             <Stack spacing={1.5} sx={{ p: 1.5 }}>
@@ -150,18 +150,18 @@ export default function KanbanBoard({ claims, practicesById, onOpenClaim, onAdva
                   <Typography variant="subtitle2" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '0.7rem' }}>
                     {stage.title}
                   </Typography>
-                  <Chip size="small" label={list.length} sx={{ backgroundColor: stage.color, color: '#0b1220', fontWeight: 900, height: 20, fontSize: '0.7rem' }} />
+                  <Chip size="small" label={list.length} sx={{ backgroundColor: stage.color, color: '#ffffff', fontWeight: 700, height: 20, fontSize: '0.7rem' }} />
                 </Stack>
-                <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.5)', fontSize: '0.65rem' }}>
+                <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.65rem' }}>
                   {stage.description}
                 </Typography>
                 {stageTotal > 0 && (
-                  <Typography variant="caption" sx={{ color: stage.color, fontWeight: 700, fontSize: '0.75rem' }}>
+                  <Typography variant="caption" sx={{ color: '#1a1a1a', fontWeight: 700, fontSize: '0.75rem' }}>
                     {formatMoney(stageTotal)} total
                   </Typography>
                 )}
               </Stack>
-              <Divider sx={{ borderColor: 'rgba(148,163,184,0.18)' }} />
+              <Divider sx={{ borderColor: '#e5e7eb' }} />
               <Stack spacing={1.25}>
                 {list.map(claim => (
                   <ClaimCard
@@ -175,7 +175,7 @@ export default function KanbanBoard({ claims, practicesById, onOpenClaim, onAdva
                   />
                 ))}
                 {list.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.55)', fontStyle: 'italic', py: 2, textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ color: '#9ca3af', fontStyle: 'italic', py: 2, textAlign: 'center' }}>
                     No claims
                   </Typography>
                 ) : null}
