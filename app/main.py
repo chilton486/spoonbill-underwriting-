@@ -176,19 +176,50 @@ class ClearinghouseWebhookRequest(BaseModel):
         return v.strip()
 
 
+ALLOWED_CDT_CODES_V1 = {
+    "D0120",
+    "D0150",
+    "D0274",
+    "D0220",
+    "D0230",
+    "D1110",
+    "D1120",
+    "D2391",
+    "D2392",
+    "D2750",
+}
+
+APPROVED_PAYERS_V1 = {
+    "Aetna",
+    "UnitedHealthcare",
+    "BCBS",
+    "Cigna",
+    "Delta Dental",
+}
+
+PROCEDURE_PAY_RATES_V1 = {
+    "D0120": 0.96,
+    "D0150": 0.94,
+    "D0274": 0.93,
+    "D0220": 0.92,
+    "D0230": 0.91,
+    "D1110": 0.96,
+    "D1120": 0.95,
+    "D2391": 0.92,
+    "D2392": 0.91,
+    "D2750": 0.88,
+}
+
+
 def _default_policy() -> UnderwritingPolicy:
     return UnderwritingPolicy(
-        approved_payers={"Aetna", "UnitedHealthcare", "BCBS", "Cigna"},
-        excluded_plan_keywords={"medicaid", "capitation", "carve-out"},
+        approved_payers=APPROVED_PAYERS_V1,
+        excluded_plan_keywords={"medicaid", "capitation", "carve-out", "hmo"},
+        allowed_procedures=ALLOWED_CDT_CODES_V1,
         procedure_pay_rate_threshold=0.90,
         min_practice_tenure_months=12,
         min_practice_clean_claim_rate=0.90,
-        procedure_historical_pay_rate={
-            "99213": 0.95,
-            "99214": 0.93,
-            "93000": 0.91,
-            "12345": 0.85,
-        },
+        procedure_historical_pay_rate=PROCEDURE_PAY_RATES_V1,
     )
 
 
@@ -842,19 +873,16 @@ def reset_demo(req: ResetDemoRequest) -> dict:
             )
         )
 
-        # Create dental claims at various stages for demo
-        # Use fixed dates relative to "today" for determinism
         today = date.today()
 
-        # Claims in "submitted" stage (ready to be underwritten)
         session.add(
             Claim(
                 claim_id="CLM-D001",
                 practice_id="Bright Smile Dental",
                 payer="Aetna",
-                procedure_code="99213",
-                billed_amount=1_850,
-                expected_allowed_amount=1_480,
+                procedure_code="D0120",
+                billed_amount=8_500,
+                expected_allowed_amount=6_800,
                 submission_date=today,
             )
         )
@@ -862,10 +890,10 @@ def reset_demo(req: ResetDemoRequest) -> dict:
             Claim(
                 claim_id="CLM-D002",
                 practice_id="Downtown Family Dentistry",
-                payer="UnitedHealthcare",
-                procedure_code="99214",
-                billed_amount=3_200,
-                expected_allowed_amount=2_560,
+                payer="Delta Dental",
+                procedure_code="D1110",
+                billed_amount=12_500,
+                expected_allowed_amount=10_000,
                 submission_date=today,
             )
         )
@@ -874,9 +902,9 @@ def reset_demo(req: ResetDemoRequest) -> dict:
                 claim_id="CLM-D003",
                 practice_id="Coastal Orthodontics",
                 payer="Cigna",
-                procedure_code="99213",
-                billed_amount=4_500,
-                expected_allowed_amount=3_600,
+                procedure_code="D2391",
+                billed_amount=22_500,
+                expected_allowed_amount=18_000,
                 submission_date=today,
             )
         )
@@ -885,9 +913,9 @@ def reset_demo(req: ResetDemoRequest) -> dict:
                 claim_id="CLM-D004",
                 practice_id="Bright Smile Dental",
                 payer="BCBS",
-                procedure_code="93000",
-                billed_amount=2_100,
-                expected_allowed_amount=1_680,
+                procedure_code="D0274",
+                billed_amount=7_500,
+                expected_allowed_amount=6_000,
                 submission_date=today,
             )
         )
@@ -895,10 +923,10 @@ def reset_demo(req: ResetDemoRequest) -> dict:
             Claim(
                 claim_id="CLM-D005",
                 practice_id="Downtown Family Dentistry",
-                payer="BCBS",
-                procedure_code="99213",
-                billed_amount=1_950,
-                expected_allowed_amount=1_560,
+                payer="UnitedHealthcare",
+                procedure_code="D2750",
+                billed_amount=150_000,
+                expected_allowed_amount=120_000,
                 submission_date=today,
             )
         )

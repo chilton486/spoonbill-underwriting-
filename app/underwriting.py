@@ -10,9 +10,11 @@ from .models import Claim, Practice
 class DeclineReason(str, Enum):
     payer_not_approved = "PAYER_NOT_APPROVED"
     payer_plan_not_supported = "PAYER_PLAN_NOT_SUPPORTED"
-    procedure_below_pay_rate_threshold = "PROCEDURE_BELOW_PAY_RATE_THRESHOLD"
+    plan_type_not_approved = "PLAN_TYPE_NOT_APPROVED"
+    procedure_not_allowed = "PROCEDURE_NOT_ALLOWED"
+    procedure_below_pay_rate_threshold = "PROCEDURE_PAY_RATE_BELOW_THRESHOLD"
     practice_tenure_too_low = "PRACTICE_TENURE_TOO_LOW"
-    practice_clean_claim_history_too_low = "PRACTICE_CLEAN_CLAIM_HISTORY_TOO_LOW"
+    practice_history_insufficient = "PRACTICE_HISTORY_INSUFFICIENT"
     exceeds_practice_exposure_limit = "EXCEEDS_PRACTICE_EXPOSURE_LIMIT"
     insufficient_pool_liquidity = "INSUFFICIENT_POOL_LIQUIDITY"
 
@@ -28,17 +30,15 @@ class UnderwritingDecision:
 class UnderwritingPolicy:
     approved_payers: Set[str]
 
-    # Explicitly excluded plan categories.
     excluded_plan_keywords: Set[str]
 
-    # Procedure pay-rate requirement (historical)
+    allowed_procedures: Set[str]
+
     procedure_pay_rate_threshold: float
 
-    # Practice requirements
     min_practice_tenure_months: int
     min_practice_clean_claim_rate: float
 
-    # Procedure-level pay rate lookup.
     procedure_historical_pay_rate: Dict[str, float]
 
 
@@ -60,12 +60,18 @@ def underwrite_claim(
         if kw.lower() in payer_lower:
             return UnderwritingDecision(False, reason_code=DeclineReason.payer_plan_not_supported.value)
 
-    pay_rate = policy.procedure_historical_pay_rate.get(claim.procedure_code)
-    if pay_rate is None or pay_rate < policy.procedure_pay_rate_threshold:
-        return UnderwritingDecision(
-            False,
-            reason_code=DeclineReason.procedure_below_pay_rate_threshold.value,
-        )
+    procedure_codes = claim.procedure_code.split(";")
+    for code in procedure_codes:
+        code = code.strip()
+        if code not in policy.allowed_procedures:
+            return UnderwritingDecision(False, reason_code=DeclineReason.procedure_not_allowed.value)
+
+        pay_rate = policy.procedure_historical_pay_rate.get(code)
+        if pay_rate is None or pay_rate < policy.procedure_pay_rate_threshold:
+            return UnderwritingDecision(
+                False,
+                reason_code=DeclineReason.procedure_below_pay_rate_threshold.value,
+            )
 
     if practice.tenure_months < policy.min_practice_tenure_months:
         return UnderwritingDecision(False, reason_code=DeclineReason.practice_tenure_too_low.value)
@@ -73,7 +79,7 @@ def underwrite_claim(
     if practice.historical_clean_claim_rate < policy.min_practice_clean_claim_rate:
         return UnderwritingDecision(
             False,
-            reason_code=DeclineReason.practice_clean_claim_history_too_low.value,
+            reason_code=DeclineReason.practice_history_insufficient.value,
         )
 
     if claim.expected_allowed_amount > remaining_practice_exposure_limit:

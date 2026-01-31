@@ -31,12 +31,11 @@ def check_pool_invariants(pool: CapitalPool) -> None:
     assert pool.capital_pending_settlement >= 0, f"Pending settlement cannot be negative: {pool.capital_pending_settlement}"
     assert pool.capital_returned >= 0, f"Returned capital cannot be negative: {pool.capital_returned}"
 
-    expected_available = pool.total_capital - pool.capital_allocated + pool.capital_returned
+    expected_available = pool.total_capital - pool.capital_allocated
     if pool.available_capital != expected_available:
         raise InvariantViolationError(
             f"Capital pool invariant violated: available_capital ({pool.available_capital}) != "
-            f"total_capital ({pool.total_capital}) - capital_allocated ({pool.capital_allocated}) + "
-            f"capital_returned ({pool.capital_returned}) = {expected_available}"
+            f"total_capital ({pool.total_capital}) - capital_allocated ({pool.capital_allocated}) = {expected_available}"
         )
 
     if pool.capital_pending_settlement > pool.capital_allocated:
