@@ -11,7 +11,7 @@ import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 
 export default function SubmitClaimDialog({ open, onClose, practices, onSubmit }) {
-  const [practiceId, setPracticeId] = React.useState('')
+  const [practiceNpi, setPracticeNpi] = React.useState('')
   const [payer, setPayer] = React.useState('')
   const [procedureCodes, setProcedureCodes] = React.useState('')
   const [billedAmount, setBilledAmount] = React.useState('')
@@ -25,7 +25,7 @@ export default function SubmitClaimDialog({ open, onClose, practices, onSubmit }
 
   React.useEffect(() => {
     if (open) {
-      setPracticeId('')
+      setPracticeNpi('')
       setPayer('')
       setProcedureCodes('')
       setBilledAmount('')
@@ -48,7 +48,7 @@ export default function SubmitClaimDialog({ open, onClose, practices, onSubmit }
       }
 
       await onSubmit({
-        practiceId,
+        practiceNpi,
         payer,
         procedureCodes: codes,
         billedAmount: parseFloat(billedAmount),
@@ -64,7 +64,7 @@ export default function SubmitClaimDialog({ open, onClose, practices, onSubmit }
     }
   }
 
-  const isValid = practiceId && payer && procedureCodes && billedAmount && expectedAllowedAmount && serviceDate && externalClaimId
+  const isValid = practiceNpi && payer && procedureCodes && billedAmount && expectedAllowedAmount && serviceDate && externalClaimId
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -76,14 +76,15 @@ export default function SubmitClaimDialog({ open, onClose, practices, onSubmit }
 
             <TextField
               select
-              label="Practice"
-              value={practiceId}
-              onChange={(e) => setPracticeId(e.target.value)}
+              label="Practice (NPI)"
+              value={practiceNpi}
+              onChange={(e) => setPracticeNpi(e.target.value)}
               required
               fullWidth
+              helperText="Select practice by NPI (National Provider Identifier)"
             >
               {(practices || []).map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.id}</MenuItem>
+                <MenuItem key={p.npi} value={p.npi}>{p.npi} - {p.id}</MenuItem>
               ))}
             </TextField>
 

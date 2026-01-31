@@ -90,6 +90,7 @@ class AdjudicationStatus(str, Enum):
 
 class Practice(SQLModel, table=True):
     id: str = Field(primary_key=True)
+    npi: str = Field(index=True, unique=True)
 
     # Underwriting inputs
     tenure_months: int

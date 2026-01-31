@@ -96,7 +96,8 @@ class ResetDemoRequest(BaseModel):
 
 
 class ClaimSubmitRequest(BaseModel):
-    practice_id: str
+    practice_npi: Optional[str] = None
+    practice_id: Optional[str] = None
     payer: str
     procedure_codes: list[str]
     billed_amount: float
@@ -104,12 +105,23 @@ class ClaimSubmitRequest(BaseModel):
     service_date: date
     external_claim_id: str
 
+    @field_validator("practice_npi")
+    @classmethod
+    def practice_npi_strip(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+        return v
+
     @field_validator("practice_id")
     @classmethod
-    def practice_id_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("practice_id cannot be empty")
-        return v.strip()
+    def practice_id_strip(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+        return v
 
     @field_validator("payer")
     @classmethod
@@ -354,16 +366,50 @@ def create_claim(req: CreateClaimRequest) -> Claim:
 
 @app.post("/claims/submit")
 def submit_claim(req: ClaimSubmitRequest) -> dict:
+    if req.practice_npi is None and req.practice_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Either practice_npi or practice_id must be provided"
+        )
+
     logger.info(
-        "Submitting claim: external_claim_id=%s, practice_id=%s, payer=%s",
-        req.external_claim_id, req.practice_id, req.payer
+        "Submitting claim: external_claim_id=%s, practice_npi=%s, practice_id=%s, payer=%s",
+        req.external_claim_id, req.practice_npi, req.practice_id, req.payer
     )
 
     with session_scope() as session:
-        practice = session.exec(select(Practice).where(Practice.id == req.practice_id)).first()
-        if practice is None:
-            logger.warning("Practice not found: practice_id=%s", req.practice_id)
-            raise HTTPException(status_code=404, detail=f"Practice not found: {req.practice_id}")
+        practice: Optional[Practice] = None
+
+        if req.practice_npi is not None:
+            practice = session.exec(
+                select(Practice).where(Practice.npi == req.practice_npi)
+            ).first()
+            if practice is None:
+                logger.warning("Practice not found: npi=%s", req.practice_npi)
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Practice not found with NPI: {req.practice_npi}"
+                )
+
+            if req.practice_id is not None and practice.id != req.practice_id:
+                logger.warning(
+                    "NPI/practice_id mismatch: npi=%s resolves to %s, but practice_id=%s provided",
+                    req.practice_npi, practice.id, req.practice_id
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"NPI {req.practice_npi} does not match practice_id {req.practice_id}"
+                )
+        else:
+            practice = session.exec(
+                select(Practice).where(Practice.id == req.practice_id)
+            ).first()
+            if practice is None:
+                logger.warning("Practice not found: practice_id=%s", req.practice_id)
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Practice not found: {req.practice_id}"
+                )
 
         existing = session.exec(
             select(Claim).where(Claim.external_claim_id == req.external_claim_id)
@@ -381,6 +427,7 @@ def submit_claim(req: ClaimSubmitRequest) -> dict:
         claim_id = f"CLM-{uuid.uuid4().hex[:8].upper()}"
 
         raw_submission = json.dumps({
+            "practice_npi": req.practice_npi,
             "practice_id": req.practice_id,
             "payer": req.payer,
             "procedure_codes": req.procedure_codes,
@@ -392,7 +439,7 @@ def submit_claim(req: ClaimSubmitRequest) -> dict:
 
         claim = Claim(
             claim_id=claim_id,
-            practice_id=req.practice_id,
+            practice_id=practice.id,
             payer=req.payer,
             procedure_code=";".join(req.procedure_codes),
             billed_amount=int(req.billed_amount * 100),
@@ -407,12 +454,14 @@ def submit_claim(req: ClaimSubmitRequest) -> dict:
         session.flush()
 
         logger.info(
-            "Claim submitted successfully: claim_id=%s, external_claim_id=%s",
-            claim_id, req.external_claim_id
+            "Claim submitted successfully: claim_id=%s, external_claim_id=%s, practice_id=%s",
+            claim_id, req.external_claim_id, practice.id
         )
 
         return {
             "claim_id": claim.claim_id,
+            "practice_id": practice.id,
+            "practice_npi": practice.npi,
             "external_claim_id": claim.external_claim_id,
             "status": claim.status.value,
             "message": "Claim submitted successfully",
@@ -758,9 +807,11 @@ def reset_demo(req: ResetDemoRequest) -> dict:
         session.add(pool)
 
         # Create dental practices with realistic profiles
+        # NPIs are 10-digit numbers; using realistic-looking demo NPIs
         session.add(
             Practice(
                 id="Bright Smile Dental",
+                npi="1234567890",
                 tenure_months=36,
                 historical_clean_claim_rate=0.97,
                 payer_mix="Aetna:0.35;BCBS:0.40;Cigna:0.25",
@@ -771,6 +822,7 @@ def reset_demo(req: ResetDemoRequest) -> dict:
         session.add(
             Practice(
                 id="Downtown Family Dentistry",
+                npi="2345678901",
                 tenure_months=24,
                 historical_clean_claim_rate=0.95,
                 payer_mix="UnitedHealthcare:0.50;BCBS:0.30;Aetna:0.20",
@@ -781,6 +833,7 @@ def reset_demo(req: ResetDemoRequest) -> dict:
         session.add(
             Practice(
                 id="Coastal Orthodontics",
+                npi="3456789012",
                 tenure_months=18,
                 historical_clean_claim_rate=0.94,
                 payer_mix="Cigna:0.45;Aetna:0.35;BCBS:0.20",

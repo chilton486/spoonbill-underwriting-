@@ -79,7 +79,7 @@ export async function resetDemo({ poolId = 'POOL' } = {}) {
 }
 
 export async function submitClaim({
-  practiceId,
+  practiceNpi,
   payer,
   procedureCodes,
   billedAmount,
@@ -90,7 +90,7 @@ export async function submitClaim({
   return request('/claims/submit', {
     method: 'POST',
     body: JSON.stringify({
-      practice_id: practiceId,
+      practice_npi: practiceNpi,
       payer: payer,
       procedure_codes: procedureCodes,
       billed_amount: billedAmount,
