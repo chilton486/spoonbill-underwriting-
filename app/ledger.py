@@ -4,7 +4,14 @@ from datetime import date
 
 from sqlmodel import Session, select
 
-from .models import CapitalPool, Claim, ClaimStatus, Practice
+from .models import (
+    CapitalPool,
+    Claim,
+    ClaimStatus,
+    InvalidStatusTransitionError,
+    Practice,
+    validate_status_transition,
+)
 
 
 class LedgerError(Exception):
@@ -21,10 +28,10 @@ def fund_claim_atomic(*, session: Session, pool_id: str, claim_id: str, funded_a
     claim = session.exec(select(Claim).where(Claim.claim_id == claim_id)).one()
     practice = session.exec(select(Practice).where(Practice.id == claim.practice_id)).one()
 
-    # Allow funding from either submitted or underwriting status
-    # (underwriting is the intermediate state after initial review)
-    if claim.status not in (ClaimStatus.submitted, ClaimStatus.underwriting):
-        raise LedgerError(f"Claim {claim.claim_id} not fundable from status={claim.status}")
+    try:
+        validate_status_transition(claim.status, ClaimStatus.funded)
+    except InvalidStatusTransitionError as e:
+        raise LedgerError(f"Claim {claim.claim_id}: {e.message}") from e
 
     remaining = get_remaining_practice_exposure_limit(practice=practice)
     if funded_amount > remaining:
@@ -64,8 +71,11 @@ def settle_claim_atomic(
     claim = session.exec(select(Claim).where(Claim.claim_id == claim_id)).one()
     practice = session.exec(select(Practice).where(Practice.id == claim.practice_id)).one()
 
-    if claim.status != ClaimStatus.funded:
-        raise LedgerError(f"Claim {claim.claim_id} not settleable from status={claim.status}")
+    target_status = ClaimStatus.exception if settlement_amount < claim.funded_amount else ClaimStatus.reimbursed
+    try:
+        validate_status_transition(claim.status, target_status)
+    except InvalidStatusTransitionError as e:
+        raise LedgerError(f"Claim {claim.claim_id}: {e.message}") from e
 
     principal = claim.funded_amount
 

@@ -9,8 +9,16 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 from .db import init_db, session_scope
-from .ledger import fund_claim_atomic, settle_claim_atomic
-from .models import CapitalPool, Claim, ClaimStatus, Practice
+from .ledger import LedgerError, fund_claim_atomic, settle_claim_atomic
+from .models import (
+    CapitalPool,
+    Claim,
+    ClaimStatus,
+    InvalidStatusTransitionError,
+    Practice,
+    get_valid_transitions,
+    validate_status_transition,
+)
 from .underwriting import UnderwritingPolicy, underwrite_claim
 
 
@@ -129,6 +137,21 @@ def list_claims(practice_id: Optional[str] = None) -> list[dict]:
         return [c.model_dump() for c in claims]
 
 
+@app.get("/claims/{claim_id}/transitions")
+def get_claim_transitions(claim_id: str) -> dict:
+    with session_scope() as session:
+        claim = session.exec(select(Claim).where(Claim.claim_id == claim_id)).first()
+        if claim is None:
+            raise HTTPException(status_code=404, detail="Claim not found")
+
+        valid_transitions = get_valid_transitions(claim.status)
+        return {
+            "claim_id": claim.claim_id,
+            "current_status": claim.status.value,
+            "valid_transitions": [s.value for s in valid_transitions],
+        }
+
+
 @app.get("/practices")
 def list_practices() -> list[dict]:
     with session_scope() as session:
@@ -178,6 +201,12 @@ def underwrite(claim_id: str, req: UnderwriteRequest) -> dict:
         claim = session.exec(select(Claim).where(Claim.claim_id == claim_id)).first()
         if claim is None:
             raise HTTPException(status_code=404, detail="Claim not found")
+
+        try:
+            validate_status_transition(claim.status, ClaimStatus.underwriting)
+        except InvalidStatusTransitionError as e:
+            raise HTTPException(status_code=400, detail=e.message)
+
         practice = session.exec(select(Practice).where(Practice.id == claim.practice_id)).one()
         pool = session.exec(select(CapitalPool).where(CapitalPool.id == req.pool_id)).one()
 
@@ -192,6 +221,7 @@ def underwrite(claim_id: str, req: UnderwriteRequest) -> dict:
 
         if not decision.approved:
             claim.decline_reason_code = decision.reason_code
+            claim.status = ClaimStatus.exception
             session.add(claim)
         else:
             claim.status = ClaimStatus.underwriting
@@ -226,12 +256,16 @@ def fund(claim_id: str, req: FundRequest) -> Claim:
             session.add(claim)
             raise HTTPException(status_code=400, detail={"reason_code": decision.reason_code})
 
-        fund_claim_atomic(
-            session=session,
-            pool_id=req.pool_id,
-            claim_id=claim_id,
-            funded_amount=decision.funded_amount,
-        )
+        try:
+            fund_claim_atomic(
+                session=session,
+                pool_id=req.pool_id,
+                claim_id=claim_id,
+                funded_amount=decision.funded_amount,
+            )
+        except LedgerError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
         session.flush()
         return session.exec(select(Claim).where(Claim.claim_id == claim_id)).one()
 
@@ -360,13 +394,17 @@ def settle(claim_id: str, req: SettleRequest) -> Claim:
         if claim is None:
             raise HTTPException(status_code=404, detail="Claim not found")
 
-        settle_claim_atomic(
-            session=session,
-            pool_id=req.pool_id,
-            claim_id=claim_id,
-            settlement_date=req.settlement_date,
-            settlement_amount=req.settlement_amount,
-        )
+        try:
+            settle_claim_atomic(
+                session=session,
+                pool_id=req.pool_id,
+                claim_id=claim_id,
+                settlement_date=req.settlement_date,
+                settlement_amount=req.settlement_amount,
+            )
+        except LedgerError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
         session.flush()
         return session.exec(select(Claim).where(Claim.claim_id == claim_id)).one()
 
