@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Platform-specific node modules
+spoonbill-frontend/node_modules/@esbuild/linux-x64/
+spoonbill-frontend/node_modules/@rollup/rollup-linux-x64-gnu/
+spoonbill-frontend/node_modules/@rollup/rollup-linux-x64-musl/
