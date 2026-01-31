@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import json
 import logging
+import uuid
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlmodel import select
 
 from .db import init_db, session_scope
 from .ledger import LedgerError, fund_claim_atomic, settle_claim_atomic
 from .models import (
+    AdjudicationStatus,
     CapitalPool,
     Claim,
     ClaimStatus,
@@ -90,6 +93,75 @@ class SimulateRequest(BaseModel):
 
 class ResetDemoRequest(BaseModel):
     pool_id: str = "POOL"
+
+
+class ClaimSubmitRequest(BaseModel):
+    practice_id: str
+    payer: str
+    procedure_codes: list[str]
+    billed_amount: float
+    expected_allowed_amount: float
+    service_date: date
+    external_claim_id: str
+
+    @field_validator("practice_id")
+    @classmethod
+    def practice_id_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("practice_id cannot be empty")
+        return v.strip()
+
+    @field_validator("payer")
+    @classmethod
+    def payer_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("payer cannot be empty")
+        return v.strip()
+
+    @field_validator("procedure_codes")
+    @classmethod
+    def procedure_codes_not_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("procedure_codes cannot be empty")
+        cleaned = [code.strip() for code in v if code.strip()]
+        if not cleaned:
+            raise ValueError("procedure_codes must contain at least one valid code")
+        return cleaned
+
+    @field_validator("billed_amount")
+    @classmethod
+    def billed_amount_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("billed_amount must be positive")
+        return v
+
+    @field_validator("expected_allowed_amount")
+    @classmethod
+    def expected_allowed_amount_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("expected_allowed_amount must be positive")
+        return v
+
+    @field_validator("external_claim_id")
+    @classmethod
+    def external_claim_id_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("external_claim_id cannot be empty")
+        return v.strip()
+
+
+class ClearinghouseWebhookRequest(BaseModel):
+    external_claim_id: str
+    status: Literal["approved", "denied"]
+    approved_amount: Optional[float] = None
+    reason_codes: Optional[list[str]] = None
+
+    @field_validator("external_claim_id")
+    @classmethod
+    def external_claim_id_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("external_claim_id cannot be empty")
+        return v.strip()
 
 
 def _default_policy() -> UnderwritingPolicy:
@@ -278,6 +350,133 @@ def create_claim(req: CreateClaimRequest) -> Claim:
         session.add(claim)
         session.flush()
         return claim
+
+
+@app.post("/claims/submit")
+def submit_claim(req: ClaimSubmitRequest) -> dict:
+    logger.info(
+        "Submitting claim: external_claim_id=%s, practice_id=%s, payer=%s",
+        req.external_claim_id, req.practice_id, req.payer
+    )
+
+    with session_scope() as session:
+        practice = session.exec(select(Practice).where(Practice.id == req.practice_id)).first()
+        if practice is None:
+            logger.warning("Practice not found: practice_id=%s", req.practice_id)
+            raise HTTPException(status_code=404, detail=f"Practice not found: {req.practice_id}")
+
+        existing = session.exec(
+            select(Claim).where(Claim.external_claim_id == req.external_claim_id)
+        ).first()
+        if existing is not None:
+            logger.warning(
+                "Duplicate external_claim_id: %s (existing claim_id=%s)",
+                req.external_claim_id, existing.claim_id
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Claim with external_claim_id '{req.external_claim_id}' already exists"
+            )
+
+        claim_id = f"CLM-{uuid.uuid4().hex[:8].upper()}"
+
+        raw_submission = json.dumps({
+            "practice_id": req.practice_id,
+            "payer": req.payer,
+            "procedure_codes": req.procedure_codes,
+            "billed_amount": req.billed_amount,
+            "expected_allowed_amount": req.expected_allowed_amount,
+            "service_date": req.service_date.isoformat(),
+            "external_claim_id": req.external_claim_id,
+        })
+
+        claim = Claim(
+            claim_id=claim_id,
+            practice_id=req.practice_id,
+            payer=req.payer,
+            procedure_code=";".join(req.procedure_codes),
+            billed_amount=int(req.billed_amount * 100),
+            expected_allowed_amount=int(req.expected_allowed_amount * 100),
+            submission_date=date.today(),
+            service_date=req.service_date,
+            external_claim_id=req.external_claim_id,
+            raw_submission=raw_submission,
+            status=ClaimStatus.submitted,
+        )
+        session.add(claim)
+        session.flush()
+
+        logger.info(
+            "Claim submitted successfully: claim_id=%s, external_claim_id=%s",
+            claim_id, req.external_claim_id
+        )
+
+        return {
+            "claim_id": claim.claim_id,
+            "external_claim_id": claim.external_claim_id,
+            "status": claim.status.value,
+            "message": "Claim submitted successfully",
+        }
+
+
+@app.post("/webhooks/clearinghouse")
+def clearinghouse_webhook(req: ClearinghouseWebhookRequest) -> dict:
+    logger.info(
+        "Clearinghouse webhook received: external_claim_id=%s, status=%s",
+        req.external_claim_id, req.status
+    )
+
+    with session_scope() as session:
+        claim = session.exec(
+            select(Claim).where(Claim.external_claim_id == req.external_claim_id)
+        ).first()
+        if claim is None:
+            logger.warning("Claim not found for external_claim_id: %s", req.external_claim_id)
+            raise HTTPException(
+                status_code=404,
+                detail=f"No claim found with external_claim_id: {req.external_claim_id}"
+            )
+
+        if claim.status != ClaimStatus.submitted:
+            logger.warning(
+                "Claim not in submitted status: claim_id=%s, status=%s",
+                claim.claim_id, claim.status.value
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Claim {claim.claim_id} is not in 'submitted' status (current: {claim.status.value})"
+            )
+
+        if req.reason_codes:
+            claim.reason_codes = ";".join(req.reason_codes)
+
+        if req.status == "approved":
+            claim.adjudication_status = AdjudicationStatus.approved
+            claim.status = ClaimStatus.adjudicated
+            if req.approved_amount is not None:
+                claim.approved_amount = int(req.approved_amount * 100)
+            logger.info(
+                "Claim adjudicated as approved: claim_id=%s, approved_amount=%s",
+                claim.claim_id, req.approved_amount
+            )
+        else:
+            claim.adjudication_status = AdjudicationStatus.denied
+            claim.status = ClaimStatus.exception
+            logger.info(
+                "Claim adjudicated as denied: claim_id=%s, reason_codes=%s",
+                claim.claim_id, req.reason_codes
+            )
+
+        session.add(claim)
+        session.flush()
+
+        return {
+            "claim_id": claim.claim_id,
+            "external_claim_id": claim.external_claim_id,
+            "status": claim.status.value,
+            "adjudication_status": claim.adjudication_status.value,
+            "message": f"Claim adjudicated as {req.status}",
+        }
 
 
 @app.post("/claims/{claim_id}/underwrite")

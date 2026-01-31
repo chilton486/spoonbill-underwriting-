@@ -9,6 +9,7 @@ from sqlmodel import Field, SQLModel
 
 class ClaimStatus(str, Enum):
     submitted = "submitted"
+    adjudicated = "adjudicated"
     underwriting = "underwriting"
     funded = "funded"
     settled = "settled"
@@ -17,7 +18,8 @@ class ClaimStatus(str, Enum):
 
 
 CLAIM_STATUS_TRANSITIONS: Dict[ClaimStatus, FrozenSet[ClaimStatus]] = {
-    ClaimStatus.submitted: frozenset({ClaimStatus.underwriting, ClaimStatus.exception}),
+    ClaimStatus.submitted: frozenset({ClaimStatus.adjudicated, ClaimStatus.underwriting, ClaimStatus.exception}),
+    ClaimStatus.adjudicated: frozenset({ClaimStatus.underwriting, ClaimStatus.exception}),
     ClaimStatus.underwriting: frozenset({ClaimStatus.funded, ClaimStatus.exception}),
     ClaimStatus.funded: frozenset({ClaimStatus.reimbursed, ClaimStatus.exception, ClaimStatus.settled}),
     ClaimStatus.settled: frozenset(),
@@ -123,6 +125,13 @@ class Claim(SQLModel, table=True):
     status: ClaimStatus = ClaimStatus.submitted
 
     decline_reason_code: Optional[str] = None
+
+    # Integration fields for real-world claim submission
+    external_claim_id: Optional[str] = Field(default=None, index=True)
+    raw_submission: Optional[str] = None
+    reason_codes: Optional[str] = None
+    service_date: Optional[date] = None
+    approved_amount: Optional[int] = None
 
 
 class CapitalPool(SQLModel, table=True):

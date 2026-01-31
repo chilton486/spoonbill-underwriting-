@@ -77,3 +77,43 @@ export async function resetDemo({ poolId = 'POOL' } = {}) {
     body: JSON.stringify({ pool_id: poolId })
   })
 }
+
+export async function submitClaim({
+  practiceId,
+  payer,
+  procedureCodes,
+  billedAmount,
+  expectedAllowedAmount,
+  serviceDate,
+  externalClaimId
+}) {
+  return request('/claims/submit', {
+    method: 'POST',
+    body: JSON.stringify({
+      practice_id: practiceId,
+      payer: payer,
+      procedure_codes: procedureCodes,
+      billed_amount: billedAmount,
+      expected_allowed_amount: expectedAllowedAmount,
+      service_date: serviceDate,
+      external_claim_id: externalClaimId
+    })
+  })
+}
+
+export async function simulateAdjudication({
+  externalClaimId,
+  status,
+  approvedAmount = null,
+  reasonCodes = null
+}) {
+  return request('/webhooks/clearinghouse', {
+    method: 'POST',
+    body: JSON.stringify({
+      external_claim_id: externalClaimId,
+      status: status,
+      approved_amount: approvedAmount,
+      reason_codes: reasonCodes
+    })
+  })
+}

@@ -17,12 +17,16 @@ import {
   resetDemo,
   settleClaim,
   simulate,
+  simulateAdjudication,
+  submitClaim,
   underwriteClaim
 } from './api.js'
 
 import KanbanBoard from './components/KanbanBoard.jsx'
 import CapitalPoolPanel from './components/CapitalPoolPanel.jsx'
 import ClaimDetailDialog from './components/ClaimDetailDialog.jsx'
+import SubmitClaimDialog from './components/SubmitClaimDialog.jsx'
+import SimulateAdjudicationDialog from './components/SimulateAdjudicationDialog.jsx'
 
 function toPracticeMap(practices) {
   const map = {}
@@ -42,6 +46,8 @@ export default function App() {
   const [recentlyAdvanced, setRecentlyAdvanced] = React.useState(null)
   const [simulating, setSimulating] = React.useState(false)
   const [resetting, setResetting] = React.useState(false)
+  const [submitClaimOpen, setSubmitClaimOpen] = React.useState(false)
+  const [adjudicationOpen, setAdjudicationOpen] = React.useState(false)
 
   const practicesById = React.useMemo(() => toPracticeMap(practices), [practices])
 
@@ -141,6 +147,16 @@ export default function App() {
     setDetailOpen(true)
   }
 
+  async function handleSubmitClaim(data) {
+    await submitClaim(data)
+    await refresh()
+  }
+
+  async function handleSimulateAdjudication(data) {
+    await simulateAdjudication(data)
+    await refresh()
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -154,8 +170,22 @@ export default function App() {
             </Stack>
 
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={() => setSubmitClaimOpen(true)}
+              >
+                Submit Claim
+              </Button>
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={() => setAdjudicationOpen(true)}
+              >
+                Simulate Adjudication
+              </Button>
               <Button 
-                variant="contained" 
+                variant="outlined" 
                 onClick={runSimulationStep}
                 disabled={simulating}
                 startIcon={simulating ? <CircularProgress size={16} color="inherit" /> : null}
@@ -226,6 +256,20 @@ export default function App() {
           onClose={() => setDetailOpen(false)}
           claim={selectedClaim}
           practice={selectedClaim ? practicesById[selectedClaim.practice_id] : null}
+        />
+
+        <SubmitClaimDialog
+          open={submitClaimOpen}
+          onClose={() => setSubmitClaimOpen(false)}
+          practices={practices}
+          onSubmit={handleSubmitClaim}
+        />
+
+        <SimulateAdjudicationDialog
+          open={adjudicationOpen}
+          onClose={() => setAdjudicationOpen(false)}
+          claims={claims}
+          onSubmit={handleSimulateAdjudication}
         />
       </Container>
     </ThemeProvider>
