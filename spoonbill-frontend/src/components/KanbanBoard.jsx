@@ -11,6 +11,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 
 const STAGES = [
   { key: 'submitted', title: 'Claim Submitted', color: '#60a5fa', description: 'Awaiting review' },
+  { key: 'adjudicated', title: 'Adjudicated', color: '#22d3ee', description: 'Payer approved' },
   { key: 'underwriting', title: 'Underwriting', color: '#fb923c', description: 'Risk assessment' },
   { key: 'funded', title: 'Funded', color: '#34d399', description: 'Capital deployed' },
   { key: 'reimbursed', title: 'Reimbursed', color: '#a78bfa', description: 'Capital returned' },
