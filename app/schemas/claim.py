@@ -94,3 +94,8 @@ class ClaimListResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ClaimTransitionRequest(BaseModel):
+    to_status: str
+    reason: Optional[str] = None

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.claim import Claim, ClaimStatus
 from ..models.user import User
-from ..schemas.claim import ClaimCreate, ClaimUpdate, ClaimResponse, ClaimListResponse
+from ..schemas.claim import ClaimCreate, ClaimUpdate, ClaimResponse, ClaimListResponse, ClaimTransitionRequest
 from ..services.audit import AuditService
 from ..services.underwriting import UnderwritingService
 from ..state_machine import validate_status_transition, get_valid_transitions, InvalidStatusTransitionError
@@ -139,7 +139,7 @@ def update_claim(
 @router.post("/{claim_id}/transition", response_model=ClaimResponse)
 def transition_claim(
     claim_id: int,
-    target_status: str = Query(..., description="Target status"),
+    transition_data: ClaimTransitionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth),
 ):
@@ -148,9 +148,9 @@ def transition_claim(
         raise HTTPException(status_code=404, detail="Claim not found")
     
     try:
-        target = ClaimStatus(target_status)
+        target = ClaimStatus(transition_data.to_status)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid status: {target_status}")
+        raise HTTPException(status_code=400, detail=f"Invalid status: {transition_data.to_status}")
     
     current = ClaimStatus(claim.status)
     
@@ -163,6 +163,7 @@ def transition_claim(
     AuditService.log_status_change(
         db, claim, current, target,
         actor_user_id=current_user.id,
+        reason=transition_data.reason,
     )
     
     db.commit()
