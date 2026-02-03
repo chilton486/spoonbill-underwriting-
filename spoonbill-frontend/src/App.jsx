@@ -3,273 +3,194 @@ import Container from '@mui/material/Container'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
-import Paper from '@mui/material/Paper'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
+import Box from '@mui/material/Box'
 import { ThemeProvider } from '@mui/material/styles'
 
 import { theme } from './theme.js'
 import {
-  fundClaim,
-  getCapitalPool,
   getClaims,
-  getPractices,
-  resetDemo,
-  settleClaim,
-  simulate,
-  simulateAdjudication,
-  submitClaim,
-  underwriteClaim
+  getCurrentUser,
+  getAuthToken,
+  logout,
 } from './api.js'
 
-import KanbanBoard from './components/KanbanBoard.jsx'
-import CapitalPoolPanel from './components/CapitalPoolPanel.jsx'
+import LoginPage from './components/LoginPage.jsx'
+import ClaimsList from './components/ClaimsList.jsx'
 import ClaimDetailDialog from './components/ClaimDetailDialog.jsx'
-import SubmitClaimDialog from './components/SubmitClaimDialog.jsx'
-import SimulateAdjudicationDialog from './components/SimulateAdjudicationDialog.jsx'
+import CreateClaimDialog from './components/CreateClaimDialog.jsx'
 
-function toPracticeMap(practices) {
-  const map = {}
-  for (const p of practices || []) map[p.id] = p
-  return map
-}
+const STATUSES = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED']
 
 export default function App() {
+  const [user, setUser] = React.useState(null)
   const [claims, setClaims] = React.useState([])
-  const [practices, setPractices] = React.useState([])
-  const [pool, setPool] = React.useState(null)
   const [error, setError] = React.useState(null)
   const [loading, setLoading] = React.useState(true)
   const [selectedClaim, setSelectedClaim] = React.useState(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [activeTab, setActiveTab] = React.useState(0)
   const [loadingClaimId, setLoadingClaimId] = React.useState(null)
-  const [recentlyAdvanced, setRecentlyAdvanced] = React.useState(null)
-  const [simulating, setSimulating] = React.useState(false)
-  const [resetting, setResetting] = React.useState(false)
-  const [submitClaimOpen, setSubmitClaimOpen] = React.useState(false)
-  const [adjudicationOpen, setAdjudicationOpen] = React.useState(false)
-
-  const practicesById = React.useMemo(() => toPracticeMap(practices), [practices])
 
   const refresh = React.useCallback(async () => {
-    const [c, p, poolData] = await Promise.all([
-      getClaims(),
-      getPractices(),
-      getCapitalPool('POOL')
-    ])
-    setClaims(c)
-    setPractices(p)
-    setPool(poolData)
+    try {
+      const allClaims = await getClaims()
+      setClaims(allClaims)
+    } catch (e) {
+      if (e.status === 401) {
+        setUser(null)
+        logout()
+      } else {
+        setError(e.message)
+      }
+    }
   }, [])
 
   React.useEffect(() => {
     let mounted = true
     ;(async () => {
+      const token = getAuthToken()
+      if (!token) {
+        setLoading(false)
+        return
+      }
       try {
-        setLoading(true)
-        setError(null)
-        // Ensure demo data exists at first load.
-        await simulate({ poolId: 'POOL', seedIfEmpty: true, advanceOneStep: false })
-        await refresh()
+        const currentUser = await getCurrentUser()
+        if (mounted) {
+          setUser(currentUser)
+          await refresh()
+        }
       } catch (e) {
-        if (!mounted) return
-        setError(e?.body ? JSON.stringify(e.body) : e.message)
+        if (mounted) {
+          logout()
+        }
       } finally {
         if (mounted) setLoading(false)
       }
     })()
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [refresh])
 
   React.useEffect(() => {
+    if (!user) return
     const id = setInterval(() => {
       refresh().catch(() => {})
-    }, 1500)
+    }, 3000)
     return () => clearInterval(id)
-  }, [refresh])
+  }, [user, refresh])
 
-  async function runSimulationStep() {
-    try {
-      setError(null)
-      setSimulating(true)
-      await simulate({ poolId: 'POOL', seedIfEmpty: true, advanceOneStep: true })
-      await refresh()
-    } catch (e) {
-      setError(e?.body ? JSON.stringify(e.body) : e.message)
-    } finally {
-      setSimulating(false)
-    }
+  const handleLogin = (loggedInUser) => {
+    setUser(loggedInUser)
+    setError(null)
+    refresh()
   }
 
-  async function handleResetDemo() {
-    try {
-      setError(null)
-      setResetting(true)
-      await resetDemo({ poolId: 'POOL' })
-      await refresh()
-    } catch (e) {
-      setError(e?.body ? JSON.stringify(e.body) : e.message)
-    } finally {
-      setResetting(false)
-    }
+  const handleLogout = () => {
+    logout()
+    setUser(null)
+    setClaims([])
   }
 
-  async function advanceClaim(claim) {
-    try {
-      setError(null)
-      setLoadingClaimId(claim.claim_id)
-      if (claim.status === 'submitted') {
-        await underwriteClaim(claim.claim_id, { poolId: 'POOL' })
-      } else if (claim.status === 'underwriting') {
-        await fundClaim(claim.claim_id, { poolId: 'POOL' })
-      } else if (claim.status === 'funded') {
-        await settleClaim(claim.claim_id, {
-          poolId: 'POOL',
-          settlementDate: new Date().toISOString().slice(0, 10),
-          settlementAmount: claim.funded_amount
-        })
-      }
-      await refresh()
-      setRecentlyAdvanced(claim.claim_id)
-      setTimeout(() => setRecentlyAdvanced(null), 2000)
-    } catch (e) {
-      setError(e?.body ? JSON.stringify(e.body) : e.message)
-      await refresh().catch(() => {})
-    } finally {
-      setLoadingClaimId(null)
-    }
-  }
-
-  function openClaim(claim) {
+  const openClaimDetail = (claim) => {
     setSelectedClaim(claim)
     setDetailOpen(true)
   }
 
-  async function handleSubmitClaim(data) {
-    await submitClaim(data)
-    await refresh()
+  const filteredClaims = React.useMemo(() => {
+    const status = STATUSES[activeTab]
+    return claims.filter(c => c.status === status)
+  }, [claims, activeTab])
+
+  const claimCounts = React.useMemo(() => {
+    const counts = {}
+    for (const s of STATUSES) counts[s] = 0
+    for (const c of claims) {
+      if (counts[c.status] !== undefined) counts[c.status]++
+    }
+    return counts
+  }, [claims])
+
+  if (loading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
+          <CircularProgress />
+          <Typography sx={{ mt: 2 }}>Loading...</Typography>
+        </Container>
+      </ThemeProvider>
+    )
   }
 
-  async function handleSimulateAdjudication(data) {
-    await simulateAdjudication(data)
-    await refresh()
+  if (!user) {
+    return (
+      <ThemeProvider theme={theme}>
+        <LoginPage onLogin={handleLogin} />
+      </ThemeProvider>
+    )
   }
 
   return (
     <ThemeProvider theme={theme}>
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Stack spacing={2.5}>
-          <Stack direction={{ xs: 'column', md: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { md: 'center' }, gap: 2 }}>
+        <Stack spacing={3}>
+          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <Stack spacing={0.5}>
-              <Typography variant="h4" sx={{ fontWeight: 900 }}>Spoonbill Claims Lifecycle</Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)' }}>
-                Deterministic underwriting + atomic capital allocation (demo UI)
+              <Typography variant="h4" sx={{ fontWeight: 900 }}>Spoonbill Internal Console</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Claim lifecycle management with audit trail
               </Typography>
             </Stack>
-
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                color="success"
-                onClick={() => setSubmitClaimOpen(true)}
-              >
-                Submit Claim
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                {user.email} ({user.role})
+              </Typography>
+              <Button variant="outlined" onClick={() => setCreateOpen(true)}>
+                Create Claim
               </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={() => setAdjudicationOpen(true)}
-              >
-                Simulate Adjudication
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={runSimulationStep}
-                disabled={simulating}
-                startIcon={simulating ? <CircularProgress size={16} color="inherit" /> : null}
-              >
-                {simulating ? 'Running...' : 'Run Simulation Step'}
-              </Button>
-              <Button
-                variant="outlined"
-                color="warning"
-                onClick={handleResetDemo}
-                disabled={resetting}
-                startIcon={resetting ? <CircularProgress size={16} color="inherit" /> : null}
-              >
-                {resetting ? 'Resetting...' : 'Reset Demo'}
+              <Button variant="outlined" color="inherit" onClick={handleLogout}>
+                Logout
               </Button>
             </Stack>
           </Stack>
 
-          {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
+          {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
-            <Stack spacing={2} sx={{ flex: 1, minWidth: 0 }}>
-              {loading ? (
-                <Stack sx={{ py: 8, alignItems: 'center' }} spacing={2}>
-                  <CircularProgress />
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)' }}>Loading demo data…</Typography>
-                </Stack>
-              ) : (
-                <KanbanBoard
-                  claims={claims}
-                  practicesById={practicesById}
-                  onOpenClaim={openClaim}
-                  onAdvanceClaim={advanceClaim}
-                  loadingClaimId={loadingClaimId}
-                  recentlyAdvanced={recentlyAdvanced}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
+              {STATUSES.map((status) => (
+                <Tab 
+                  key={status} 
+                  label={`${status.replace('_', ' ')} (${claimCounts[status]})`}
                 />
-              )}
-            </Stack>
+              ))}
+            </Tabs>
+          </Box>
 
-            <Stack spacing={2} sx={{ width: { xs: '100%', lg: 340 }, flexShrink: 0 }}>
-              <CapitalPoolPanel pool={pool} />
-              <Paper variant="outlined" sx={{ p: 2.25, borderColor: 'rgba(148,163,184,0.22)' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.25 }}>How It Works</Typography>
-                <Stack spacing={1}>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
-                    1. Practices submit dental insurance claims
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
-                    2. Spoonbill underwrites risk instantly
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
-                    3. Capital is deployed same-day to practice
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.7)', fontSize: '0.8rem' }}>
-                    4. Insurer reimburses Spoonbill days later
-                  </Typography>
-                </Stack>
-                <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.5)', display: 'block', mt: 1.5 }}>
-                  Click "Next" on any claim to advance it through the lifecycle.
-                </Typography>
-              </Paper>
-            </Stack>
-          </Stack>
+          <ClaimsList
+            claims={filteredClaims}
+            onOpenClaim={openClaimDetail}
+            loadingClaimId={loadingClaimId}
+          />
         </Stack>
 
         <ClaimDetailDialog
           open={detailOpen}
           onClose={() => setDetailOpen(false)}
           claim={selectedClaim}
-          practice={selectedClaim ? practicesById[selectedClaim.practice_id] : null}
+          onRefresh={refresh}
         />
 
-        <SubmitClaimDialog
-          open={submitClaimOpen}
-          onClose={() => setSubmitClaimOpen(false)}
-          practices={practices}
-          onSubmit={handleSubmitClaim}
-        />
-
-        <SimulateAdjudicationDialog
-          open={adjudicationOpen}
-          onClose={() => setAdjudicationOpen(false)}
-          claims={claims}
-          onSubmit={handleSimulateAdjudication}
+        <CreateClaimDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => {
+            setCreateOpen(false)
+            refresh()
+          }}
         />
       </Container>
     </ThemeProvider>
