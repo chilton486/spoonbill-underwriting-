@@ -13,8 +13,11 @@ Phase 1 implementation of the Spoonbill claim lifecycle management system with a
 ### 1. Start PostgreSQL
 
 ```bash
-docker-compose up -d
+# Start only the database container
+docker-compose up -d db
 ```
+
+This starts a PostgreSQL container on port 5432 with database `spoonbill`.
 
 ### 2. Set up Backend
 
@@ -26,24 +29,40 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy environment file
+# Copy environment file and configure
 cp .env.example .env
+# IMPORTANT: Edit .env and set ADMIN_PASSWORD before proceeding
+```
 
-# Run database migrations
+### 3. Run Database Migrations
+
+```bash
 alembic upgrade head
+```
 
-# Seed initial admin user
+### 4. Seed Initial Admin User
+
+```bash
+# Set your admin password (required)
+export ADMIN_PASSWORD='your-secure-password-here'
+
+# Create the admin user
 python -m app.cli
 ```
 
-### 3. Start Backend
+**CLI Behavior:**
+- If the admin user doesn't exist, it creates one with the email from `ADMIN_EMAIL` (default: admin@spoonbill.com)
+- If the admin user already exists, it prints a message and exits successfully (idempotent)
+- If `ADMIN_PASSWORD` is not set, it exits with an error
+
+### 5. Start Backend
 
 ```bash
 source .venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 4. Start Frontend
+### 6. Start Frontend
 
 ```bash
 cd spoonbill-frontend
@@ -51,15 +70,13 @@ npm install
 npm run dev
 ```
 
-### 5. Access the Application
+### 7. Access the Application
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
-Default admin credentials (from .env):
-- Email: admin@spoonbill.com
-- Password: changeme123
+Login with the admin email and the password you set in `ADMIN_PASSWORD`.
 
 ## Environment Variables
 
@@ -74,7 +91,7 @@ Copy `.env.example` to `.env` and configure:
 | UNDERWRITING_AMOUNT_THRESHOLD_CENTS | Amount requiring review | 100000 ($1000) |
 | UNDERWRITING_AUTO_APPROVE_BELOW_CENTS | Auto-approve threshold | 10000 ($100) |
 | ADMIN_EMAIL | Initial admin email | admin@spoonbill.com |
-| ADMIN_PASSWORD | Initial admin password | changeme123 |
+| ADMIN_PASSWORD | Initial admin password | **Required - no default** |
 
 ## Claim Lifecycle
 
@@ -88,79 +105,119 @@ NEW → NEEDS_REVIEW → APPROVED → PAID → COLLECTING → CLOSED
 
 ### Status Definitions
 
-- **NEW**: Claim just created, awaiting underwriting
-- **NEEDS_REVIEW**: Underwriting flagged for manual review
+- **NEW**: Initial status when claim is created (transient - underwriting runs immediately)
+- **NEEDS_REVIEW**: Underwriting flagged for manual review (amount exceeds threshold, missing fields)
 - **APPROVED**: Underwriting approved, ready for payment
 - **PAID**: Payment sent to practice
 - **COLLECTING**: Collecting from payer
 - **CLOSED**: Claim fully resolved
-- **DECLINED**: Claim rejected
+- **DECLINED**: Claim rejected (duplicate or manual decline)
 
-## API Endpoints
+**Note:** When a claim is created via `POST /api/claims`, underwriting runs automatically and the claim transitions from NEW to APPROVED, NEEDS_REVIEW, or DECLINED within the same request. The NEW status is transient and you typically won't see claims in NEW status in the UI.
 
-### Authentication
+## Duplicate Detection
+
+Claims are deduplicated using a fingerprint computed from:
+- `practice_id` (nullable - treated as empty string if null)
+- `patient_name` (nullable - treated as empty string if null)
+- `procedure_date` (nullable - treated as empty string if null)
+- `amount_cents` (required)
+- `payer` (required)
+
+**Important:** Since `practice_id` is nullable, two claims without a practice_id but with the same patient_name, procedure_date, amount_cents, and payer will be considered duplicates. If you need stronger duplicate detection, always provide `practice_id`.
+
+## Reproduce Phase 1 Flow
+
+Here's a complete curl-based walkthrough to verify the system works:
 
 ```bash
-# Login
-curl -X POST http://localhost:8000/auth/login \
+# 1. Login and get token
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin@spoonbill.com&password=changeme123"
+  -d "username=admin@spoonbill.com&password=YOUR_PASSWORD" | jq -r '.access_token')
 
-# Get current user
-curl http://localhost:8000/auth/me \
-  -H "Authorization: Bearer <token>"
-```
+echo "Token: $TOKEN"
 
-### Claims
-
-```bash
-# Create a claim (triggers automatic underwriting)
-curl -X POST http://localhost:8000/api/claims \
-  -H "Authorization: Bearer <token>" \
+# 2. Create a claim (underwriting runs automatically)
+# Expected: claim created with status APPROVED (amount below threshold)
+curl -s -X POST http://localhost:8000/api/claims \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "payer": "Aetna",
     "amount_cents": 15000,
     "patient_name": "John Doe",
     "procedure_date": "2026-01-15",
+    "practice_id": "PRAC-001",
     "procedure_codes": "D0120, D1110"
-  }'
+  }' | jq .
 
-# List claims
-curl http://localhost:8000/api/claims \
-  -H "Authorization: Bearer <token>"
+# Expected response includes:
+# - "status": "APPROVED" (auto-approved, amount < $1000 threshold)
+# - "underwriting_decisions": array with APPROVE decision
+# - "audit_events": array with CLAIM_CREATED, UNDERWRITING_DECISION, STATUS_CHANGE
 
-# List claims by status
-curl "http://localhost:8000/api/claims?status=NEW" \
-  -H "Authorization: Bearer <token>"
-
-# Get claim detail
-curl http://localhost:8000/api/claims/1 \
-  -H "Authorization: Bearer <token>"
-
-# Get valid transitions for a claim
-curl http://localhost:8000/api/claims/1/transitions \
-  -H "Authorization: Bearer <token>"
-
-# Transition claim status
-curl -X POST http://localhost:8000/api/claims/1/transition \
-  -H "Authorization: Bearer <token>" \
+# 3. Create a claim that requires review (amount > threshold)
+curl -s -X POST http://localhost:8000/api/claims \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"to_status": "APPROVED", "reason": "Manual approval after review"}'
-```
+  -d '{
+    "payer": "BCBS",
+    "amount_cents": 150000,
+    "patient_name": "Jane Smith",
+    "procedure_date": "2026-01-16",
+    "practice_id": "PRAC-002"
+  }' | jq .
 
-### Users (Admin only)
+# Expected: "status": "NEEDS_REVIEW" (amount > $1000 threshold)
 
-```bash
-# Create user
-curl -X POST http://localhost:8000/api/users \
-  -H "Authorization: Bearer <token>" \
+# 4. List all claims
+curl -s http://localhost:8000/api/claims \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# 5. Get valid transitions for claim 1
+curl -s http://localhost:8000/api/claims/1/transitions \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Expected: {"claim_id": 1, "current_status": "APPROVED", "valid_transitions": ["PAID", "DECLINED"]}
+
+# 6. Transition claim 1 from APPROVED to PAID
+curl -s -X POST http://localhost:8000/api/claims/1/transition \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"email": "ops@spoonbill.com", "password": "password123", "role": "OPS"}'
+  -d '{"to_status": "PAID", "reason": "Payment processed"}' | jq .
 
-# List users
-curl http://localhost:8000/api/users \
-  -H "Authorization: Bearer <token>"
+# Expected: status changes to PAID, new audit event added
+
+# 7. View claim detail with full audit trail
+curl -s http://localhost:8000/api/claims/1 \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Expected: audit_events array shows:
+# - CLAIM_CREATED (NEW)
+# - UNDERWRITING_DECISION
+# - STATUS_CHANGE (NEW → APPROVED)
+# - STATUS_CHANGE (APPROVED → PAID)
+
+# 8. Manually approve the NEEDS_REVIEW claim
+curl -s -X POST http://localhost:8000/api/claims/2/transition \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"to_status": "APPROVED", "reason": "Manual approval after review"}' | jq .
+
+# 9. Try to create a duplicate claim (should fail)
+curl -s -X POST http://localhost:8000/api/claims \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payer": "Aetna",
+    "amount_cents": 15000,
+    "patient_name": "John Doe",
+    "procedure_date": "2026-01-15",
+    "practice_id": "PRAC-001"
+  }' | jq .
+
+# Expected: 409 Conflict with "Duplicate claim detected"
 ```
 
 ## Underwriting Rules
@@ -169,9 +226,9 @@ The rules-based underwriting engine evaluates claims automatically:
 
 1. **Missing payer** → NEEDS_REVIEW
 2. **Missing amount** → NEEDS_REVIEW
-3. **Duplicate claim** → DECLINE (based on fingerprint: practice_id + patient_name + procedure_date + amount_cents + payer)
-4. **Amount > threshold** → NEEDS_REVIEW
-5. **Amount < auto-approve threshold** → APPROVE (auto)
+3. **Duplicate claim** → DECLINE (based on fingerprint)
+4. **Amount > threshold** (default $1000) → NEEDS_REVIEW
+5. **Amount < auto-approve threshold** (default $100) → APPROVE (auto)
 6. **Otherwise** → APPROVE
 
 ## Running Tests
@@ -201,8 +258,8 @@ alembic downgrade -1
 │   ├── main.py              # FastAPI app entry point
 │   ├── config.py            # Settings from environment
 │   ├── database.py          # SQLAlchemy setup
-│   ├── state_machine.py     # Claim status transitions
-│   ├── cli.py               # CLI commands (seed admin)
+│   ├── state_machine.py     # Claim status transition validation
+│   ├── cli.py               # CLI commands (seed admin - idempotent)
 │   ├── models/              # SQLAlchemy models
 │   ├── schemas/             # Pydantic schemas
 │   ├── routers/             # API endpoints

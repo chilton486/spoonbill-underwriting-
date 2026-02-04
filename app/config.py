@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     underwriting_auto_approve_below_cents: int = 10000
     
     admin_email: str = "admin@spoonbill.com"
-    admin_password: str = "changeme123"
+    admin_password: str = ""
     
     class Config:
         env_file = ".env"
