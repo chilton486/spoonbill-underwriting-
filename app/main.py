@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import auth_router, claims_router, users_router
+from .routers import auth_router, claims_router, users_router, practice_router
 
 app = FastAPI(
     title="Spoonbill Internal System of Record",
-    description="Phase 1: Claim lifecycle management with underwriting and audit trail",
-    version="1.0.0",
+    description="Phase 2: Multi-tenant practice portal with claim lifecycle management",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -24,8 +24,9 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(claims_router)
 app.include_router(users_router)
+app.include_router(practice_router)
 
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"status": "healthy", "version": "2.0.0"}

@@ -1,6 +1,7 @@
 from datetime import datetime, date
 from enum import Enum
-from sqlalchemy import Column, Integer, String, DateTime, Date, BigInteger
+from typing import Optional
+from sqlalchemy import Column, Integer, String, DateTime, Date, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -34,7 +35,7 @@ class Claim(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     
-    practice_id = Column(String(255), nullable=True, index=True)
+    practice_id = Column(Integer, ForeignKey("practices.id"), nullable=False, index=True)
     patient_name = Column(String(255), nullable=True)
     payer = Column(String(255), nullable=False)
     amount_cents = Column(BigInteger, nullable=False)
@@ -50,13 +51,15 @@ class Claim(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
+    practice = relationship("Practice", back_populates="claims")
     underwriting_decisions = relationship("UnderwritingDecision", back_populates="claim")
     audit_events = relationship("AuditEvent", back_populates="claim")
+    documents = relationship("ClaimDocument", back_populates="claim")
     
     @staticmethod
-    def compute_fingerprint(practice_id: str, patient_name: str, procedure_date: date, amount_cents: int, payer: str) -> str:
+    def compute_fingerprint(practice_id: Optional[int], patient_name: str, procedure_date: date, amount_cents: int, payer: str) -> str:
         parts = [
-            practice_id or "",
+            str(practice_id) if practice_id else "",
             patient_name or "",
             procedure_date.isoformat() if procedure_date else "",
             str(amount_cents),

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..database import get_db
-from ..models.user import User
+from ..models.user import User, UserRole
 from ..schemas.auth import Token
 from ..schemas.user import UserResponse
 from ..services.auth import AuthService
@@ -15,6 +15,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+SPOONBILL_ROLES = {UserRole.SPOONBILL_ADMIN.value, UserRole.SPOONBILL_OPS.value}
 
 
 def get_current_user(
@@ -47,15 +49,58 @@ def require_auth(
     return current_user
 
 
-def require_admin(
+def require_spoonbill_admin(
     current_user: User = Depends(require_auth),
 ) -> User:
-    if current_user.role != "ADMIN":
+    if current_user.role != UserRole.SPOONBILL_ADMIN.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
+            detail="Spoonbill Admin access required",
         )
     return current_user
+
+
+def require_spoonbill_user(
+    current_user: User = Depends(require_auth),
+) -> User:
+    if current_user.role not in SPOONBILL_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Spoonbill employee access required",
+        )
+    return current_user
+
+
+def require_practice_manager(
+    current_user: User = Depends(require_auth),
+) -> User:
+    if current_user.role != UserRole.PRACTICE_MANAGER.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Practice Manager access required",
+        )
+    if not current_user.practice_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Practice Manager must be associated with a practice",
+        )
+    return current_user
+
+
+def get_current_practice_scope(current_user: User = Depends(require_auth)) -> Optional[int]:
+    if current_user.role in SPOONBILL_ROLES:
+        return None
+    if current_user.role == UserRole.PRACTICE_MANAGER.value:
+        return current_user.practice_id
+    return None
+
+
+def get_practice_ids_for_user(current_user: User) -> Optional[List[int]]:
+    if current_user.role in SPOONBILL_ROLES:
+        return None
+    if current_user.role == UserRole.PRACTICE_MANAGER.value and current_user.practice_id:
+        return [current_user.practice_id]
+    return []
 
 
 @router.post("/login", response_model=Token)
@@ -75,9 +120,10 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is deactivated",
         )
-    access_token = AuthService.create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role}
-    )
+    token_data = {"sub": str(user.id), "email": user.email, "role": user.role}
+    if user.practice_id:
+        token_data["practice_id"] = user.practice_id
+    access_token = AuthService.create_access_token(data=token_data)
     return Token(access_token=access_token)
 
 
