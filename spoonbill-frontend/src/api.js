@@ -1,11 +1,32 @@
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+let authToken = localStorage.getItem('authToken')
+
+export function setAuthToken(token) {
+  authToken = token
+  if (token) {
+    localStorage.setItem('authToken', token)
+  } else {
+    localStorage.removeItem('authToken')
+  }
+}
+
+export function getAuthToken() {
+  return authToken
+}
 
 async function request(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  }
+  
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    },
+    headers,
     ...options
   })
 
@@ -14,7 +35,7 @@ async function request(path, options = {}) {
   const body = isJson ? await res.json() : await res.text()
 
   if (!res.ok) {
-    const err = new Error('API request failed')
+    const err = new Error(body?.detail || 'API request failed')
     err.status = res.status
     err.body = body
     throw err
@@ -23,97 +44,93 @@ async function request(path, options = {}) {
   return body
 }
 
-export async function getClaims() {
-  return request('/claims')
+export async function login(email, password) {
+  const formData = new URLSearchParams()
+  formData.append('username', email)
+  formData.append('password', password)
+  
+  const res = await fetch(`${BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  })
+  
+  const body = await res.json()
+  
+  if (!res.ok) {
+    throw new Error(body?.detail || 'Login failed')
+  }
+  
+  setAuthToken(body.access_token)
+  return body
 }
 
-export async function getPractices() {
-  return request('/practices')
+export async function logout() {
+  setAuthToken(null)
 }
 
-export async function getCapitalPool(poolId = 'POOL') {
-  return request(`/capital-pool/${encodeURIComponent(poolId)}`)
+export async function getCurrentUser() {
+  return request('/auth/me')
 }
 
-export async function simulate({ poolId = 'POOL', seedIfEmpty = true, advanceOneStep = true } = {}) {
-  return request('/simulate', {
+export async function getClaims(status = null) {
+  const params = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request(`/api/claims${params}`)
+}
+
+export async function getClaim(claimId) {
+  return request(`/api/claims/${claimId}`)
+}
+
+export async function createClaim(data) {
+  return request('/api/claims', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function updateClaim(claimId, data) {
+  return request(`/api/claims/${claimId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function transitionClaim(claimId, toStatus, reason = null) {
+  return request(`/api/claims/${claimId}/transition`, {
     method: 'POST',
     body: JSON.stringify({
-      pool_id: poolId,
-      seed_if_empty: seedIfEmpty,
-      advance_one_step: advanceOneStep
+      to_status: toStatus,
+      reason: reason
     })
   })
 }
 
-export async function underwriteClaim(claimId, { poolId = 'POOL' } = {}) {
-  return request(`/claims/${encodeURIComponent(claimId)}/underwrite`, {
+export async function getValidTransitions(claimId) {
+  return request(`/api/claims/${claimId}/transitions`)
+}
+
+export async function getUsers() {
+  return request('/api/users')
+}
+
+export async function createUser(data) {
+  return request('/api/users', {
     method: 'POST',
-    body: JSON.stringify({ pool_id: poolId })
+    body: JSON.stringify(data)
   })
 }
 
-export async function fundClaim(claimId, { poolId = 'POOL' } = {}) {
-  return request(`/claims/${encodeURIComponent(claimId)}/fund`, {
-    method: 'POST',
-    body: JSON.stringify({ pool_id: poolId })
+export async function deactivateUser(userId) {
+  return request(`/api/users/${userId}/deactivate`, {
+    method: 'PATCH'
   })
 }
 
-export async function settleClaim(claimId, { poolId = 'POOL', settlementDate, settlementAmount } = {}) {
-  return request(`/claims/${encodeURIComponent(claimId)}/settle`, {
-    method: 'POST',
-    body: JSON.stringify({
-      pool_id: poolId,
-      settlement_date: settlementDate,
-      settlement_amount: settlementAmount
-    })
-  })
-}
-
-export async function resetDemo({ poolId = 'POOL' } = {}) {
-  return request('/reset', {
-    method: 'POST',
-    body: JSON.stringify({ pool_id: poolId })
-  })
-}
-
-export async function submitClaim({
-  practiceNpi,
-  payer,
-  procedureCodes,
-  billedAmount,
-  expectedAllowedAmount,
-  serviceDate,
-  externalClaimId
-}) {
-  return request('/claims/submit', {
-    method: 'POST',
-    body: JSON.stringify({
-      practice_npi: practiceNpi,
-      payer: payer,
-      procedure_codes: procedureCodes,
-      billed_amount: billedAmount,
-      expected_allowed_amount: expectedAllowedAmount,
-      service_date: serviceDate,
-      external_claim_id: externalClaimId
-    })
-  })
-}
-
-export async function simulateAdjudication({
-  externalClaimId,
-  status,
-  approvedAmount = null,
-  reasonCodes = null
-}) {
-  return request('/webhooks/clearinghouse', {
-    method: 'POST',
-    body: JSON.stringify({
-      external_claim_id: externalClaimId,
-      status: status,
-      approved_amount: approvedAmount,
-      reason_codes: reasonCodes
-    })
+export async function activateUser(userId) {
+  return request(`/api/users/${userId}/activate`, {
+    method: 'PATCH'
   })
 }
