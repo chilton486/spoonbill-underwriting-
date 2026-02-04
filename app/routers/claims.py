@@ -10,7 +10,7 @@ from ..schemas.claim import ClaimCreate, ClaimUpdate, ClaimResponse, ClaimListRe
 from ..services.audit import AuditService
 from ..services.underwriting import UnderwritingService
 from ..state_machine import validate_status_transition, get_valid_transitions, InvalidStatusTransitionError
-from .auth import get_current_user, require_auth
+from .auth import get_current_user, require_spoonbill_user
 
 router = APIRouter(prefix="/api/claims", tags=["claims"])
 
@@ -73,12 +73,15 @@ def create_claim(
 @router.get("", response_model=List[ClaimListResponse])
 def list_claims(
     status: Optional[str] = Query(None, description="Filter by status"),
+    practice_id: Optional[int] = Query(None, description="Filter by practice ID"),
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: User = Depends(require_spoonbill_user),
 ):
     query = db.query(Claim)
     if status:
         query = query.filter(Claim.status == status)
+    if practice_id:
+        query = query.filter(Claim.practice_id == practice_id)
     query = query.order_by(Claim.created_at.desc())
     return query.all()
 
@@ -87,7 +90,7 @@ def list_claims(
 def get_claim(
     claim_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: User = Depends(require_spoonbill_user),
 ):
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
     if not claim:
@@ -100,7 +103,7 @@ def update_claim(
     claim_id: int,
     claim_data: ClaimUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_auth),
+    current_user: User = Depends(require_spoonbill_user),
 ):
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
     if not claim:
@@ -141,7 +144,7 @@ def transition_claim(
     claim_id: int,
     transition_data: ClaimTransitionRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_auth),
+    current_user: User = Depends(require_spoonbill_user),
 ):
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
     if not claim:
@@ -175,7 +178,7 @@ def transition_claim(
 def get_claim_transitions(
     claim_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: User = Depends(require_spoonbill_user),
 ):
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
     if not claim:

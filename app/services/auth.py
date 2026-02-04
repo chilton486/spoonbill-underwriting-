@@ -49,12 +49,19 @@ class AuthService:
         return user
 
     @staticmethod
-    def create_user(db: Session, email: str, password: str, role: UserRole = UserRole.OPS) -> User:
+    def create_user(
+        db: Session,
+        email: str,
+        password: str,
+        role: UserRole = UserRole.SPOONBILL_OPS,
+        practice_id: Optional[int] = None,
+    ) -> User:
         hashed_password = AuthService.get_password_hash(password)
         user = User(
             email=email,
             password_hash=hashed_password,
             role=role.value,
+            practice_id=practice_id,
         )
         db.add(user)
         db.commit()

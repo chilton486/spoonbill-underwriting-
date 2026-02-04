@@ -3,9 +3,31 @@ from typing import Optional, List
 from pydantic import BaseModel, field_validator
 
 
-
 class ClaimCreate(BaseModel):
-    practice_id: Optional[str] = None
+    practice_id: int
+    patient_name: Optional[str] = None
+    payer: str
+    amount_cents: int
+    procedure_date: Optional[date] = None
+    external_claim_id: Optional[str] = None
+    procedure_codes: Optional[str] = None
+
+    @field_validator("payer")
+    @classmethod
+    def payer_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("payer cannot be empty")
+        return v.strip()
+
+    @field_validator("amount_cents")
+    @classmethod
+    def amount_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("amount_cents must be positive")
+        return v
+
+
+class PracticeClaimCreate(BaseModel):
     patient_name: Optional[str] = None
     payer: str
     amount_cents: int
@@ -29,7 +51,6 @@ class ClaimCreate(BaseModel):
 
 
 class ClaimUpdate(BaseModel):
-    practice_id: Optional[str] = None
     patient_name: Optional[str] = None
     payer: Optional[str] = None
     amount_cents: Optional[int] = None
@@ -63,7 +84,7 @@ class AuditEventResponse(BaseModel):
 
 class ClaimResponse(BaseModel):
     id: int
-    practice_id: Optional[str]
+    practice_id: int
     patient_name: Optional[str]
     payer: str
     amount_cents: int
@@ -83,7 +104,7 @@ class ClaimResponse(BaseModel):
 
 class ClaimListResponse(BaseModel):
     id: int
-    practice_id: Optional[str]
+    practice_id: int
     patient_name: Optional[str]
     payer: str
     amount_cents: int
