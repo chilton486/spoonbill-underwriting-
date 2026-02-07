@@ -10,7 +10,7 @@ class AuditService:
     @staticmethod
     def log_event(
         db: Session,
-        claim_id: int,
+        claim_id: Optional[int],
         action: str,
         from_status: Optional[str] = None,
         to_status: Optional[str] = None,

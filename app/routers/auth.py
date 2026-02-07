@@ -71,6 +71,10 @@ def require_spoonbill_user(
     return current_user
 
 
+# Alias for require_spoonbill_user
+require_spoonbill_role = require_spoonbill_user
+
+
 def require_practice_manager(
     current_user: User = Depends(require_auth),
 ) -> User:

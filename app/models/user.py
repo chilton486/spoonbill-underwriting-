@@ -27,3 +27,4 @@ class User(Base):
     audit_events = relationship("AuditEvent", back_populates="actor")
     underwriting_decisions = relationship("UnderwritingDecision", back_populates="decided_by_user")
     uploaded_documents = relationship("ClaimDocument", back_populates="uploaded_by")
+    invites = relationship("PracticeManagerInvite", back_populates="user")

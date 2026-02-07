@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import auth_router, claims_router, users_router, practice_router, payments_router
+from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router
 
 app = FastAPI(
     title="Spoonbill Internal System of Record",
-    description="Phase 3: Payments MVP with ledger and payment orchestration",
-    version="3.0.0",
+    description="Phase 4: Practice Onboarding with underwriting intake flow",
+    version="4.0.0",
 )
 
 app.add_middleware(
@@ -14,6 +14,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:5174",
+        "http://localhost:5175",
         "http://localhost:3000",
     ],
     allow_credentials=True,
@@ -26,8 +27,9 @@ app.include_router(claims_router)
 app.include_router(users_router)
 app.include_router(practice_router)
 app.include_router(payments_router)
+app.include_router(applications_router)
 
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "version": "3.0.0"}
+    return {"status": "healthy", "version": "4.0.0"}
