@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from enum import Enum
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Date, BigInteger, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Date, BigInteger, ForeignKey, Boolean, Text
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -48,6 +48,9 @@ class Claim(Base):
     external_claim_id = Column(String(255), nullable=True, index=True)
     procedure_codes = Column(String(500), nullable=True)
     
+    payment_exception = Column(Boolean, nullable=False, default=False)
+    exception_code = Column(Text, nullable=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
@@ -55,6 +58,8 @@ class Claim(Base):
     underwriting_decisions = relationship("UnderwritingDecision", back_populates="claim")
     audit_events = relationship("AuditEvent", back_populates="claim")
     documents = relationship("ClaimDocument", back_populates="claim")
+    payment_intent = relationship("PaymentIntent", back_populates="claim", uselist=False)
+    ledger_entries = relationship("LedgerEntry", back_populates="claim")
     
     @staticmethod
     def compute_fingerprint(practice_id: Optional[int], patient_name: str, procedure_date: date, amount_cents: int, payer: str) -> str:

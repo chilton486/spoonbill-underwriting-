@@ -143,3 +143,18 @@ export const listDocuments = async (claimId) => {
 export const getDocumentDownloadUrl = (documentId) => {
   return `${API_BASE_URL}/practice/documents/${documentId}`;
 };
+
+export const getPaymentStatus = async (claimId) => {
+  const response = await fetch(`${API_BASE_URL}/practice/claims/${claimId}/payment`, {
+    headers: headers(),
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    throw new Error('Failed to fetch payment status');
+  }
+
+  return response.json();
+};

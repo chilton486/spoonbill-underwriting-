@@ -20,7 +20,7 @@ import TextField from '@mui/material/TextField'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
 
-import { getClaim, getValidTransitions, transitionClaim } from '../api.js'
+import { getClaim, getValidTransitions, transitionClaim, getPaymentForClaim, processPayment, retryPayment } from '../api.js'
 
 function formatCurrency(cents) {
   if (cents === null || cents === undefined) return '-'
@@ -53,6 +53,8 @@ export default function ClaimDetailDialog({ open, onClose, claim: initialClaim, 
   const [loading, setLoading] = React.useState(false)
   const [transitioning, setTransitioning] = React.useState(false)
   const [error, setError] = React.useState(null)
+  const [payment, setPayment] = React.useState(null)
+  const [processingPayment, setProcessingPayment] = React.useState(false)
 
   React.useEffect(() => {
     if (!open || !initialClaim) {
@@ -61,6 +63,7 @@ export default function ClaimDetailDialog({ open, onClose, claim: initialClaim, 
       setSelectedTransition('')
       setReason('')
       setError(null)
+      setPayment(null)
       return
     }
 
@@ -68,13 +71,15 @@ export default function ClaimDetailDialog({ open, onClose, claim: initialClaim, 
     ;(async () => {
       setLoading(true)
       try {
-        const [claimData, transitions] = await Promise.all([
+        const [claimData, transitions, paymentData] = await Promise.all([
           getClaim(initialClaim.id),
-          getValidTransitions(initialClaim.id)
+          getValidTransitions(initialClaim.id),
+          getPaymentForClaim(initialClaim.id).catch(() => null)
         ])
         if (mounted) {
           setClaim(claimData)
           setValidTransitions(transitions.valid_transitions || [])
+          setPayment(paymentData)
         }
       } catch (e) {
         if (mounted) setError(e.message)
@@ -105,6 +110,47 @@ export default function ClaimDetailDialog({ open, onClose, claim: initialClaim, 
       setError(e.message)
     } finally {
       setTransitioning(false)
+    }
+  }
+
+  const handleProcessPayment = async () => {
+    setProcessingPayment(true)
+    setError(null)
+    try {
+      const result = await processPayment(claim.id)
+      setPayment(result.payment_intent)
+      const [claimData, transitions] = await Promise.all([
+        getClaim(claim.id),
+        getValidTransitions(claim.id)
+      ])
+      setClaim(claimData)
+      setValidTransitions(transitions.valid_transitions || [])
+      if (onRefresh) onRefresh()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setProcessingPayment(false)
+    }
+  }
+
+  const handleRetryPayment = async () => {
+    if (!payment) return
+    setProcessingPayment(true)
+    setError(null)
+    try {
+      const result = await retryPayment(payment.id)
+      setPayment(result.payment_intent)
+      const [claimData, transitions] = await Promise.all([
+        getClaim(claim.id),
+        getValidTransitions(claim.id)
+      ])
+      setClaim(claimData)
+      setValidTransitions(transitions.valid_transitions || [])
+      if (onRefresh) onRefresh()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setProcessingPayment(false)
     }
   }
 
@@ -193,6 +239,81 @@ export default function ClaimDetailDialog({ open, onClose, claim: initialClaim, 
                   </Stack>
                 ))}
               </Paper>
+            )}
+
+            {(claim.status === 'APPROVED' || payment) && (
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>Payment Status</Typography>
+                {payment ? (
+                  <Stack spacing={1}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography color="text.secondary">Status:</Typography>
+                      <Chip 
+                        label={payment.status} 
+                        size="small"
+                        color={payment.status === 'CONFIRMED' ? 'success' : payment.status === 'FAILED' ? 'error' : 'warning'}
+                      />
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography color="text.secondary">Amount:</Typography>
+                      <Typography>{formatCurrency(payment.amount_cents)}</Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography color="text.secondary">Provider:</Typography>
+                      <Typography>{payment.provider}</Typography>
+                    </Stack>
+                    {payment.provider_reference && (
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography color="text.secondary">Reference:</Typography>
+                        <Typography sx={{ fontFamily: 'monospace' }}>{payment.provider_reference}</Typography>
+                      </Stack>
+                    )}
+                    {payment.confirmed_at && (
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography color="text.secondary">Confirmed:</Typography>
+                        <Typography>{formatDateTime(payment.confirmed_at)}</Typography>
+                      </Stack>
+                    )}
+                    {payment.failure_code && (
+                      <Alert severity="error" sx={{ mt: 1 }}>
+                        {payment.failure_code}: {payment.failure_message}
+                      </Alert>
+                    )}
+                    {payment.status === 'FAILED' && (
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        onClick={handleRetryPayment}
+                        disabled={processingPayment}
+                        startIcon={processingPayment ? <CircularProgress size={20} color="inherit" /> : null}
+                        sx={{ mt: 1 }}
+                      >
+                        {processingPayment ? 'Retrying...' : 'Retry Payment'}
+                      </Button>
+                    )}
+                  </Stack>
+                ) : claim.status === 'APPROVED' ? (
+                  <Stack spacing={2}>
+                    <Typography color="text.secondary">
+                      This claim is approved and ready for payment.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      onClick={handleProcessPayment}
+                      disabled={processingPayment}
+                      startIcon={processingPayment ? <CircularProgress size={20} color="inherit" /> : null}
+                    >
+                      {processingPayment ? 'Processing...' : 'Process Payment'}
+                    </Button>
+                  </Stack>
+                ) : null}
+              </Paper>
+            )}
+
+            {claim.payment_exception && (
+              <Alert severity="warning">
+                Payment Exception: {claim.exception_code || 'Unknown error'}
+              </Alert>
             )}
 
             {claim.audit_events && claim.audit_events.length > 0 && (

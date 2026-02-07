@@ -9,6 +9,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..models.claim import Claim, ClaimStatus
 from ..models.document import ClaimDocument
+from ..models.payment import PaymentIntent
 from ..models.user import User
 from ..schemas.claim import PracticeClaimCreate, ClaimResponse, ClaimListResponse
 from ..schemas.document import DocumentUploadResponse, DocumentListResponse
@@ -227,3 +228,35 @@ def download_document(
         filename=document.filename,
         media_type=document.content_type,
     )
+
+
+@router.get("/claims/{claim_id}/payment")
+def get_claim_payment_status(
+    claim_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_practice_manager),
+):
+    practice_id = current_user.practice_id
+    
+    get_claim_for_practice(db, claim_id, practice_id)
+    verify_claim_ownership(db, claim_id, practice_id)
+    
+    payment = db.query(PaymentIntent).filter(
+        PaymentIntent.claim_id == claim_id,
+        PaymentIntent.practice_id == practice_id
+    ).first()
+    
+    if not payment:
+        return None
+    
+    return {
+        "id": str(payment.id),
+        "status": payment.status,
+        "amount_cents": payment.amount_cents,
+        "currency": payment.currency,
+        "provider": payment.provider,
+        "provider_reference": payment.provider_reference,
+        "confirmed_at": payment.confirmed_at.isoformat() if payment.confirmed_at else None,
+        "failure_code": payment.failure_code,
+        "failure_message": payment.failure_message,
+    }
