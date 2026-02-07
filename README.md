@@ -345,3 +345,113 @@ Phase 2 implements strict multi-tenant isolation with defense-in-depth:
 **Unauthorized Access**: Returns 404 (not 403) to avoid information disclosure about whether a resource exists.
 
 **Document Storage**: Files are stored on disk with a Docker volume (`/data/uploads`). Download endpoints enforce practice scoping, not just document ID lookup.
+
+## Phase 3: Payments MVP
+
+Phase 3 introduces safe, auditable capital movement tied to approved insurance claims.
+
+### Ledger Design
+
+The system uses double-entry accounting with three account types:
+
+- **CAPITAL_CASH**: Spoonbill's available capital
+- **PAYMENT_CLEARING**: In-flight payments
+- **PRACTICE_PAYABLE**: Amounts owed to practices
+
+Every financial event creates paired ledger entries (DEBIT/CREDIT) that sum to zero.
+
+### Payment Flow
+
+1. **Claim APPROVED** → PaymentIntent created (QUEUED)
+2. **Reserve funds** → CAPITAL_CASH debited, PAYMENT_CLEARING credited
+3. **Send payment** → PaymentIntent status → SENT
+4. **Confirm payment** → PAYMENT_CLEARING debited, PRACTICE_PAYABLE credited, claim → PAID
+5. **Failure path** → Reversal entries posted, claim gets payment_exception flag
+
+### Payment API Endpoints
+
+```bash
+# Process payment for an approved claim
+curl -X POST http://localhost:8000/api/payments/claims/1/process \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get payment status for a claim
+curl http://localhost:8000/api/payments/claims/1 \
+  -H "Authorization: Bearer $TOKEN"
+
+# Retry a failed payment
+curl -X POST http://localhost:8000/api/payments/1/retry \
+  -H "Authorization: Bearer $TOKEN"
+
+# Seed capital (admin only)
+curl -X POST http://localhost:8000/api/payments/capital/seed \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount_cents": 100000000}'
+
+# Get capital balance
+curl http://localhost:8000/api/payments/capital/balance \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Idempotency Guarantees
+
+- Each claim can have exactly one PaymentIntent (UNIQUE constraint on claim_id)
+- Deterministic idempotency key: `claim:{claim_id}:payment:v1`
+- Ledger entries have unique idempotency keys to prevent double-posting
+- Retry operations check existing state before creating new entries
+
+## Phase 3.1: Hardening + Product Updates
+
+### Claim Tokenization
+
+Every claim gets a unique, non-guessable `claim_token` in the format `SB-CLM-<8 chars base32>`.
+
+- Generated at claim creation time
+- Immutable and indexed for fast lookups
+- Displayed in both Internal Console and Practice Portal
+- Can be used for filtering in Practice Portal
+
+### Practice Portal Filters
+
+The Practice Portal now supports server-enforced filtering:
+
+```bash
+# Filter by claim token
+curl "http://localhost:8000/practice/claims?claim_token=SB-CLM-A3B7C9D2" \
+  -H "Authorization: Bearer $PM_TOKEN"
+
+# Filter by date range
+curl "http://localhost:8000/practice/claims?submitted_from=2026-01-01&submitted_to=2026-01-31" \
+  -H "Authorization: Bearer $PM_TOKEN"
+
+# Search across patient name, payer, external claim ID
+curl "http://localhost:8000/practice/claims?q=John" \
+  -H "Authorization: Bearer $PM_TOKEN"
+
+# Pagination
+curl "http://localhost:8000/practice/claims?page=1&page_size=20" \
+  -H "Authorization: Bearer $PM_TOKEN"
+```
+
+All filters are optional and composable. Results are always tenant-scoped and ordered by most recent first.
+
+### Running Tests
+
+```bash
+# Run all tests
+source .venv/bin/activate
+pytest tests/ -v
+
+# Run payment-specific tests
+pytest tests/test_payments.py -v
+
+# Run tenant isolation tests
+pytest tests/test_tenant_isolation.py -v
+```
+
+### UI Improvements
+
+- **Theme Parity**: Internal Console now uses the same light theme (ChatGPT colorway) as Practice Portal
+- **Role Badge**: Both UIs display the current user's role (Admin/Ops/Practice Manager)
+- **Claim Token Display**: Claim tokens shown in list views and detail dialogs

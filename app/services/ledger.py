@@ -1,6 +1,6 @@
 import uuid
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
@@ -263,6 +263,27 @@ class LedgerService:
         
         logger.info(f"Released reservation for payment {payment_intent.id}, returned {payment_intent.amount_cents} cents to capital")
         return debit_entry, credit_entry
+
+    @staticmethod
+    def get_entries_for_payment_intent(db: Session, payment_intent_id: uuid.UUID) -> List[LedgerEntry]:
+        """Get all ledger entries associated with a payment intent.
+        
+        This allows tracing PaymentIntent → all ledger entries.
+        """
+        return db.query(LedgerEntry).filter(
+            LedgerEntry.related_type == LedgerEntryRelatedType.PAYMENT_INTENT.value,
+            LedgerEntry.related_id == payment_intent_id,
+        ).order_by(LedgerEntry.created_at).all()
+
+    @staticmethod
+    def get_entries_for_claim(db: Session, claim_id: int) -> List[LedgerEntry]:
+        """Get all ledger entries associated with a claim.
+        
+        This allows tracing Claim → all ledger entries.
+        """
+        return db.query(LedgerEntry).filter(
+            LedgerEntry.claim_id == claim_id,
+        ).order_by(LedgerEntry.created_at).all()
 
     @staticmethod
     def get_ledger_summary(db: Session, currency: str = "USD") -> dict:

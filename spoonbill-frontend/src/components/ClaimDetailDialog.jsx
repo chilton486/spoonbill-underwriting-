@@ -182,6 +182,10 @@ export default function ClaimDetailDialog({ open, onClose, claim: initialClaim, 
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>Claim Information</Typography>
               <Stack spacing={1}>
                 <Stack direction="row" justifyContent="space-between">
+                  <Typography color="text.secondary">Claim Token:</Typography>
+                  <Typography sx={{ fontFamily: 'monospace', fontWeight: 600 }}>{claim.claim_token}</Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between">
                   <Typography color="text.secondary">Payer:</Typography>
                   <Typography>{claim.payer}</Typography>
                 </Stack>
