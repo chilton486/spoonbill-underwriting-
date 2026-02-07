@@ -2,7 +2,7 @@ import uuid
 import logging
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from ..models.ledger import (
     LedgerAccount, LedgerAccountType, LedgerEntry, 
@@ -55,7 +55,7 @@ class LedgerService:
         query = db.query(
             func.coalesce(
                 func.sum(
-                    func.case(
+                    case(
                         (LedgerEntry.direction == LedgerEntryDirection.CREDIT.value, LedgerEntry.amount_cents),
                         else_=-LedgerEntry.amount_cents
                     )
@@ -275,7 +275,7 @@ class LedgerService:
         total_payable = db.query(
             func.coalesce(
                 func.sum(
-                    func.case(
+                    case(
                         (LedgerEntry.direction == LedgerEntryDirection.CREDIT.value, LedgerEntry.amount_cents),
                         else_=-LedgerEntry.amount_cents
                     )
