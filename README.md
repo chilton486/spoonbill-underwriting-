@@ -360,6 +360,16 @@ The system uses double-entry accounting with three account types:
 
 Every financial event creates paired ledger entries (DEBIT/CREDIT) that sum to zero.
 
+### Ledger Invariants
+
+The ledger is the authoritative source of truth for all financial state. The following invariants must always hold:
+
+- Claim status reflects workflow state, not money. Never use claim status to infer balances.
+- All money movement must be represented by ledger entries. There is no "off-ledger" capital.
+- Ledger entries are immutable. Once posted, entries are never modified or deleted.
+- Reversals are compensating entries. To undo a financial event, post offsetting DEBIT/CREDIT entries.
+- Paired entries sum to zero. Every financial event creates balanced entries across accounts.
+
 ### Payment Flow
 
 1. **Claim APPROVED** → PaymentIntent created (QUEUED)
@@ -367,6 +377,17 @@ Every financial event creates paired ledger entries (DEBIT/CREDIT) that sum to z
 3. **Send payment** → PaymentIntent status → SENT
 4. **Confirm payment** → PAYMENT_CLEARING debited, PRACTICE_PAYABLE credited, claim → PAID
 5. **Failure path** → Reversal entries posted, claim gets payment_exception flag
+
+### Payment Exception Behavior
+
+Payment failures do not introduce a new claim lifecycle state. When a payment fails:
+
+- The claim remains in APPROVED status
+- `claims.payment_exception` is set to `true`
+- `claims.exception_code` may be set (e.g., `PAYMENT_FAILED`)
+- Reversal ledger entries are posted to return reserved funds to CAPITAL_CASH
+
+To proceed after a payment failure, Ops must retry the payment via the retry endpoint. The claim only transitions to PAID after successful payment confirmation. This design keeps the claim lifecycle clean while providing visibility into payment issues through the exception flags.
 
 ### Payment API Endpoints
 
@@ -383,7 +404,7 @@ curl http://localhost:8000/api/payments/claims/1 \
 curl -X POST http://localhost:8000/api/payments/1/retry \
   -H "Authorization: Bearer $TOKEN"
 
-# Seed capital (admin only)
+# Seed capital (development/demo only - see warning below)
 curl -X POST http://localhost:8000/api/payments/capital/seed \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -393,6 +414,8 @@ curl -X POST http://localhost:8000/api/payments/capital/seed \
 curl http://localhost:8000/api/payments/capital/balance \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+**Seed Capital Warning**: The `/api/payments/capital/seed` endpoint is for development and demo use only. In production environments, this endpoint must be disabled, gated behind additional authorization, or removed entirely. Live capitalized systems should never use this endpoint; capital should be managed through proper treasury operations with full audit trails.
 
 ### Idempotency Guarantees
 
@@ -411,6 +434,15 @@ Every claim gets a unique, non-guessable `claim_token` in the format `SB-CLM-<8 
 - Immutable and indexed for fast lookups
 - Displayed in both Internal Console and Practice Portal
 - Can be used for filtering in Practice Portal
+
+### Claim Token Guarantees
+
+The claim token provides a stable, external-safe identifier for each claim:
+
+- **Immutable**: Once created, a claim's token never changes. The token is set at creation and cannot be modified.
+- **Never reused**: Tokens are never recycled or rotated. Each token uniquely identifies exactly one claim forever.
+- **Non-guessable**: Tokens use cryptographically random base32 encoding. Sequential IDs cannot be used to discover other claims.
+- **Stable across operations**: The token remains constant through retries, payment failures, status transitions, and reprocessing. External systems can safely use claim tokens as persistent references.
 
 ### Practice Portal Filters
 
@@ -455,3 +487,12 @@ pytest tests/test_tenant_isolation.py -v
 - **Theme Parity**: Internal Console now uses the same light theme (ChatGPT colorway) as Practice Portal
 - **Role Badge**: Both UIs display the current user's role (Admin/Ops/Practice Manager)
 - **Claim Token Display**: Claim tokens shown in list views and detail dialogs
+
+## Known Limitations / Future Work
+
+The following limitations are known and may be addressed in future phases:
+
+- **Decision-date filtering performance**: Filtering by decision date uses audit_events subqueries. At scale, this may require additional database indexes on `audit_events.claim_id` and `audit_events.created_at`.
+- **CI test coverage**: CI does not yet run PostgreSQL-backed integration tests. Current tests use SQLite for speed; full integration testing against PostgreSQL should be added before production deployment.
+- **Simulated payment provider**: The simulated payment provider has simplified success/failure behavior. Real provider integrations will have more complex retry logic, timeout handling, and status polling.
+- **FedNow integration**: Future FedNow integration will extend (not replace) the current payment provider abstraction. The `PaymentProvider` base class is designed to support multiple provider implementations.
