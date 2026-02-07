@@ -7,6 +7,7 @@ from .document import ClaimDocument
 from .payment import PaymentIntent, PaymentIntentStatus, PaymentProvider, PAYMENT_INTENT_TRANSITIONS, TERMINAL_PAYMENT_STATUSES
 from .ledger import LedgerAccount, LedgerAccountType, LedgerEntry, LedgerEntryDirection, LedgerEntryStatus, LedgerEntryRelatedType
 from .practice_application import PracticeApplication, ApplicationStatus, PracticeType, BillingModel, UrgencyLevel
+from .invite import PracticeManagerInvite
 
 __all__ = [
     "User",
@@ -35,4 +36,5 @@ __all__ = [
     "PracticeType",
     "BillingModel",
     "UrgencyLevel",
+    "PracticeManagerInvite",
 ]

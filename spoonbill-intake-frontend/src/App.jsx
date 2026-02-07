@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Container from '@mui/material/Container';
@@ -391,7 +392,202 @@ function SuccessScreen({ applicationId, email }) {
   );
 }
 
-function App() {
+function SetPasswordPage() {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [validating, setValidating] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const validateToken = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/invite/${token}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Invalid invite link');
+        }
+        const data = await response.json();
+        setEmail(data.email);
+        setValidating(false);
+      } catch (err) {
+        setError(err.message);
+        setValidating(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+    validateToken();
+  }, [token]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/set-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to set password');
+      }
+
+      setSuccess(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Container maxWidth="sm" sx={{ py: 8 }}>
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <CircularProgress />
+            <Typography sx={{ mt: 2 }}>Validating invite link...</Typography>
+          </Paper>
+        </Container>
+      </ThemeProvider>
+    );
+  }
+
+  if (validating && error) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Container maxWidth="sm" sx={{ py: 8 }}>
+          <Paper sx={{ p: 4 }}>
+            <Typography variant="h5" gutterBottom color="error">
+              Invalid Invite Link
+            </Typography>
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+            <Typography variant="body2" color="text.secondary">
+              Please contact support if you need assistance.
+            </Typography>
+          </Paper>
+        </Container>
+      </ThemeProvider>
+    );
+  }
+
+  if (success) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Container maxWidth="sm" sx={{ py: 8 }}>
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h5" gutterBottom>
+              Password Set Successfully
+            </Typography>
+            <Typography variant="body1" paragraph>
+              Your account is now active. You can log in to the Practice Portal with your email:
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 3 }}>
+              {email}
+            </Typography>
+            <Button
+              variant="contained"
+              href="http://localhost:5174"
+              target="_blank"
+            >
+              Go to Practice Portal
+            </Button>
+          </Paper>
+        </Container>
+      </ThemeProvider>
+    );
+  }
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Container maxWidth="sm" sx={{ py: 8 }}>
+        <Paper sx={{ p: 4 }}>
+          <Typography variant="h4" align="center" gutterBottom>
+            Set Your Password
+          </Typography>
+          <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 4 }}>
+            Welcome to Spoonbill! Please set a password for your account.
+          </Typography>
+
+          <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Account Email:
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+              {email}
+            </Typography>
+          </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <TextField
+              label="New Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              fullWidth
+              sx={{ mb: 2 }}
+              helperText="Minimum 8 characters"
+            />
+            <TextField
+              label="Confirm Password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              fullWidth
+              sx={{ mb: 3 }}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              disabled={submitting}
+              startIcon={submitting ? <CircularProgress size={20} /> : null}
+            >
+              {submitting ? 'Setting Password...' : 'Set Password'}
+            </Button>
+          </form>
+        </Paper>
+      </Container>
+    </ThemeProvider>
+  );
+}
+
+function ApplicationForm() {
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
@@ -558,6 +754,17 @@ function App() {
         </Paper>
       </Container>
     </ThemeProvider>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<ApplicationForm />} />
+        <Route path="/set-password/:token" element={<SetPasswordPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

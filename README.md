@@ -546,12 +546,37 @@ curl -X POST http://localhost:8000/internal/applications/1/review \
 When an application is approved:
 
 1. A new Practice is created with the legal name from the application
-2. A new PRACTICE_MANAGER user is created with the contact email
-3. A temporary password is generated and returned in the API response
+2. A new PRACTICE_MANAGER user is created with the contact email (with a random, never-shown password)
+3. A one-time invite token is generated (expires in 7 days)
 4. The application is linked to the created practice for audit purposes
 5. Audit events are logged for application approval, practice creation, and user creation
 
-The temporary password must be securely shared with the practice manager. They can then log into the Practice Portal at http://localhost:5174.
+The Ops user receives an invite link that they share with the practice manager. The link goes to a set-password page where the manager creates their own password.
+
+### Invite Token Flow
+
+1. **Ops approves application** → Invite token generated
+2. **Ops copies invite link** → `http://localhost:5175/set-password/{token}`
+3. **Practice manager opens link** → Token validated, set-password form shown
+4. **Manager sets password** → Token marked as used, account activated
+5. **Manager logs in** → Practice Portal at http://localhost:5174
+
+Invite tokens are:
+- Single-use (cannot be reused after password is set)
+- Time-limited (expire after 7 days)
+- Secure (64-character random token)
+
+### Security Hardening
+
+The public `/apply` endpoint includes several protections:
+
+**Rate Limiting**: IP-based rate limiting (5 requests per hour per IP) prevents abuse.
+
+**Input Validation**: Server-side validation enforces max length constraints, required fields, and email/phone format checks.
+
+**Honeypot Field**: A hidden `company_url` field catches spam bots. If filled, the submission appears to succeed but is silently rejected.
+
+**Rejection Logging**: All rejected submissions are logged with the reason (no sensitive data logged).
 
 ### Internal Console Applications Queue
 

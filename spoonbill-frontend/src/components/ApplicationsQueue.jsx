@@ -106,11 +106,36 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
             <Typography variant="subtitle2" gutterBottom>Application Approved</Typography>
             <Typography variant="body2">Practice ID: {approvalResult.practice_id}</Typography>
             <Typography variant="body2">Manager Email: {approvalResult.manager_email}</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 'bold', mt: 1 }}>
-              Temporary Password: {approvalResult.temporary_password}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              Please securely share these credentials with the practice manager.
+            <Box sx={{ mt: 2, p: 2, bgcolor: '#f0fdf4', borderRadius: 1, border: '1px solid #86efac' }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Invite Link (expires in 7 days):
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontFamily: 'monospace', 
+                  wordBreak: 'break-all',
+                  bgcolor: '#fff',
+                  p: 1,
+                  borderRadius: 0.5,
+                  border: '1px solid #e5e7eb'
+                }}
+              >
+                http://localhost:5175/set-password/{approvalResult.invite_token}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                sx={{ mt: 1 }}
+                onClick={() => {
+                  navigator.clipboard.writeText(`http://localhost:5175/set-password/${approvalResult.invite_token}`);
+                }}
+              >
+                Copy Invite Link
+              </Button>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+              Share this link with the practice manager. They will use it to set their password and activate their account.
             </Typography>
           </Alert>
         )}
