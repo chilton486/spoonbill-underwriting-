@@ -93,6 +93,7 @@ class ClaimResponse(BaseModel):
     fingerprint: Optional[str]
     external_claim_id: Optional[str]
     procedure_codes: Optional[str]
+    claim_token: str
     created_at: datetime
     updated_at: datetime
     underwriting_decisions: List[UnderwritingDecisionResponse] = []
@@ -110,6 +111,7 @@ class ClaimListResponse(BaseModel):
     amount_cents: int
     procedure_date: Optional[date]
     status: str
+    claim_token: str
     created_at: datetime
     updated_at: datetime
 

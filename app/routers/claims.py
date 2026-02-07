@@ -45,6 +45,7 @@ def create_claim(
         external_claim_id=claim_data.external_claim_id,
         procedure_codes=claim_data.procedure_codes,
         fingerprint=fingerprint,
+        claim_token=Claim.generate_claim_token(),
         status=ClaimStatus.NEW.value,
     )
     db.add(claim)

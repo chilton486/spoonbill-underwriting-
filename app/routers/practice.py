@@ -1,9 +1,11 @@
 from typing import List, Optional
+from datetime import date
 import os
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from ..config import get_settings
 from ..database import get_db
@@ -77,6 +79,7 @@ def submit_claim(
         external_claim_id=claim_data.external_claim_id,
         procedure_codes=claim_data.procedure_codes,
         fingerprint=fingerprint,
+        claim_token=Claim.generate_claim_token(),
         status=ClaimStatus.NEW.value,
     )
     db.add(claim)
@@ -101,18 +104,85 @@ def submit_claim(
     return claim
 
 
+class PaginatedClaimsResponse:
+    """Response model for paginated claims list."""
+    pass
+
+
 @router.get("/claims", response_model=List[ClaimListResponse])
 def list_practice_claims(
-    status_filter: Optional[str] = None,
+    status_filter: Optional[str] = Query(None, description="Filter by status"),
+    claim_id: Optional[int] = Query(None, description="Filter by claim ID"),
+    claim_token: Optional[str] = Query(None, description="Filter by claim token"),
+    submitted_from: Optional[date] = Query(None, description="Filter by submission date (from)"),
+    submitted_to: Optional[date] = Query(None, description="Filter by submission date (to)"),
+    decision_from: Optional[date] = Query(None, description="Filter by decision date (from)"),
+    decision_to: Optional[date] = Query(None, description="Filter by decision date (to)"),
+    q: Optional[str] = Query(None, description="Search across patient name, payer, external claim ID"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_practice_manager),
 ):
+    """List claims for the current practice with filtering and pagination.
+    
+    All filters are optional and composable. Results are always tenant-scoped
+    (practice_id derived from JWT) and ordered by most recent first.
+    """
     practice_id = current_user.practice_id
     
     query = db.query(Claim).filter(Claim.practice_id == practice_id)
+    
     if status_filter:
         query = query.filter(Claim.status == status_filter)
+    
+    if claim_id:
+        query = query.filter(Claim.id == claim_id)
+    
+    if claim_token:
+        query = query.filter(Claim.claim_token == claim_token)
+    
+    if submitted_from:
+        query = query.filter(Claim.created_at >= submitted_from)
+    
+    if submitted_to:
+        from datetime import datetime
+        end_of_day = datetime.combine(submitted_to, datetime.max.time())
+        query = query.filter(Claim.created_at <= end_of_day)
+    
+    if decision_from:
+        from ..models.audit import AuditEvent
+        subquery = db.query(AuditEvent.claim_id).filter(
+            AuditEvent.action == "UNDERWRITING_DECISION",
+            AuditEvent.created_at >= decision_from
+        ).subquery()
+        query = query.filter(Claim.id.in_(subquery))
+    
+    if decision_to:
+        from ..models.audit import AuditEvent
+        from datetime import datetime
+        end_of_day = datetime.combine(decision_to, datetime.max.time())
+        subquery = db.query(AuditEvent.claim_id).filter(
+            AuditEvent.action == "UNDERWRITING_DECISION",
+            AuditEvent.created_at <= end_of_day
+        ).subquery()
+        query = query.filter(Claim.id.in_(subquery))
+    
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            or_(
+                Claim.patient_name.ilike(search_term),
+                Claim.payer.ilike(search_term),
+                Claim.external_claim_id.ilike(search_term),
+            )
+        )
+    
     query = query.order_by(Claim.created_at.desc())
+    
+    offset = (page - 1) * page_size
+    query = query.offset(offset).limit(page_size)
+    
     return query.all()
 
 

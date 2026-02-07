@@ -8,6 +8,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
+import Chip from '@mui/material/Chip'
 import { ThemeProvider } from '@mui/material/styles'
 
 import { theme } from './theme.js'
@@ -145,8 +146,13 @@ export default function App() {
               </Typography>
             </Stack>
             <Stack direction="row" spacing={2} alignItems="center">
+              <Chip 
+                label={user.role === 'ADMIN' ? 'Admin' : 'Ops'} 
+                size="small" 
+                sx={{ bgcolor: '#1a1a1a', color: '#ffffff', fontWeight: 600 }}
+              />
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {user.email} ({user.role})
+                {user.email}
               </Typography>
               <Button variant="outlined" onClick={() => setCreateOpen(true)}>
                 Create Claim

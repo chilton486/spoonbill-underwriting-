@@ -304,3 +304,50 @@ class TestLedgerServiceExceptions:
         
         error = DuplicateEntryError("duplicate entry")
         assert str(error) == "duplicate entry"
+
+
+class TestClaimToken:
+    """Unit tests for claim token generation."""
+    
+    def test_claim_token_format(self):
+        """Test that claim token follows expected format: SB-CLM-<8 chars>."""
+        from app.models.claim import Claim
+        
+        token = Claim.generate_claim_token()
+        assert token.startswith("SB-CLM-")
+        assert len(token) == 15  # "SB-CLM-" (7) + 8 chars
+    
+    def test_claim_token_is_unique(self):
+        """Test that multiple token generations produce different tokens."""
+        from app.models.claim import Claim
+        
+        tokens = [Claim.generate_claim_token() for _ in range(100)]
+        assert len(set(tokens)) == 100  # All unique
+    
+    def test_claim_token_characters_are_base32(self):
+        """Test that token suffix uses base32 characters."""
+        from app.models.claim import Claim
+        import string
+        
+        token = Claim.generate_claim_token()
+        suffix = token[7:]  # Remove "SB-CLM-" prefix
+        base32_chars = set(string.ascii_uppercase + "234567")
+        assert all(c in base32_chars for c in suffix)
+
+
+class TestLedgerTracing:
+    """Unit tests for ledger tracing helper methods."""
+    
+    def test_get_entries_for_payment_intent_method_exists(self):
+        """Test that get_entries_for_payment_intent method exists."""
+        from app.services.ledger import LedgerService
+        
+        assert hasattr(LedgerService, 'get_entries_for_payment_intent')
+        assert callable(getattr(LedgerService, 'get_entries_for_payment_intent'))
+    
+    def test_get_entries_for_claim_method_exists(self):
+        """Test that get_entries_for_claim method exists."""
+        from app.services.ledger import LedgerService
+        
+        assert hasattr(LedgerService, 'get_entries_for_claim')
+        assert callable(getattr(LedgerService, 'get_entries_for_claim'))

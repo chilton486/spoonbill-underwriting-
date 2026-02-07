@@ -1,3 +1,5 @@
+import secrets
+import base64
 from datetime import datetime, date
 from enum import Enum
 from typing import Optional
@@ -48,6 +50,8 @@ class Claim(Base):
     external_claim_id = Column(String(255), nullable=True, index=True)
     procedure_codes = Column(String(500), nullable=True)
     
+    claim_token = Column(String(20), unique=True, index=True, nullable=False)
+    
     payment_exception = Column(Boolean, nullable=False, default=False)
     exception_code = Column(Text, nullable=True)
     
@@ -60,6 +64,17 @@ class Claim(Base):
     documents = relationship("ClaimDocument", back_populates="claim")
     payment_intent = relationship("PaymentIntent", back_populates="claim", uselist=False)
     ledger_entries = relationship("LedgerEntry", back_populates="claim")
+    
+    @staticmethod
+    def generate_claim_token() -> str:
+        """Generate a unique, non-guessable claim token.
+        
+        Format: SB-CLM-<8 chars base32>
+        Example: SB-CLM-A3B7C9D2
+        """
+        random_bytes = secrets.token_bytes(5)
+        token_chars = base64.b32encode(random_bytes).decode('ascii')[:8]
+        return f"SB-CLM-{token_chars}"
     
     @staticmethod
     def compute_fingerprint(practice_id: Optional[int], patient_name: str, procedure_date: date, amount_cents: int, payer: str) -> str:

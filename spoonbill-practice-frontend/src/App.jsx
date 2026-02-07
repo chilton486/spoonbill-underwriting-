@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
 
 import LoginPage from './components/LoginPage';
 import ClaimsList from './components/ClaimsList';
@@ -17,10 +18,12 @@ function App() {
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({});
+  const filtersRef = useRef({});
 
-  const fetchClaims = useCallback(async () => {
+  const fetchClaims = useCallback(async (currentFilters = {}) => {
     try {
-      const data = await listClaims();
+      const data = await listClaims(currentFilters);
       setClaims(data);
     } catch (err) {
       console.error('Failed to fetch claims:', err);
@@ -51,11 +54,17 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      fetchClaims();
-      const interval = setInterval(fetchClaims, 5000);
+      fetchClaims(filtersRef.current);
+      const interval = setInterval(() => fetchClaims(filtersRef.current), 5000);
       return () => clearInterval(interval);
     }
   }, [user, fetchClaims]);
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    filtersRef.current = newFilters;
+    fetchClaims(newFilters);
+  };
 
   const handleLogin = async (userData) => {
     if (userData.role !== 'PRACTICE_MANAGER') {
@@ -124,6 +133,11 @@ function App() {
             Practice Portal
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Chip 
+              label="Practice Manager" 
+              size="small" 
+              sx={{ bgcolor: '#e5e7eb', color: '#374151', fontWeight: 600 }}
+            />
             <Typography variant="body2" color="text.secondary">
               {user.email}
             </Typography>
@@ -141,6 +155,7 @@ function App() {
           claims={claims}
           onClaimSelect={handleClaimSelect}
           onSubmitClick={() => setSubmitDialogOpen(true)}
+          onFilterChange={handleFilterChange}
         />
 
         {selectedClaim && (

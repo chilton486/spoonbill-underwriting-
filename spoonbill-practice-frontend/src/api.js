@@ -58,11 +58,22 @@ export const getCurrentUser = async () => {
   return response.json();
 };
 
-export const listClaims = async (statusFilter = null) => {
-  let url = `${API_BASE_URL}/practice/claims`;
-  if (statusFilter) {
-    url += `?status_filter=${statusFilter}`;
-  }
+export const listClaims = async (filters = {}) => {
+  const params = new URLSearchParams();
+  
+  if (filters.status_filter) params.append('status_filter', filters.status_filter);
+  if (filters.claim_id) params.append('claim_id', filters.claim_id);
+  if (filters.claim_token) params.append('claim_token', filters.claim_token);
+  if (filters.submitted_from) params.append('submitted_from', filters.submitted_from);
+  if (filters.submitted_to) params.append('submitted_to', filters.submitted_to);
+  if (filters.decision_from) params.append('decision_from', filters.decision_from);
+  if (filters.decision_to) params.append('decision_to', filters.decision_to);
+  if (filters.q) params.append('q', filters.q);
+  if (filters.page) params.append('page', filters.page);
+  if (filters.page_size) params.append('page_size', filters.page_size);
+
+  const queryString = params.toString();
+  const url = `${API_BASE_URL}/practice/claims${queryString ? `?${queryString}` : ''}`;
 
   const response = await fetch(url, {
     headers: headers(),

@@ -142,7 +142,12 @@ function ClaimDetail({ claimId, open, onClose }) {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">Claim #{claim.id}</Typography>
+          <Box>
+            <Typography variant="h6">Claim #{claim.id}</Typography>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+              {claim.claim_token}
+            </Typography>
+          </Box>
           <Chip
             label={claim.status}
             color={statusColors[claim.status] || 'default'}
@@ -151,6 +156,10 @@ function ClaimDetail({ claimId, open, onClose }) {
       </DialogTitle>
       <DialogContent dividers>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary">Claim Token</Typography>
+            <Typography sx={{ fontFamily: 'monospace' }}>{claim.claim_token}</Typography>
+          </Box>
           <Box>
             <Typography variant="caption" color="text.secondary">Patient Name</Typography>
             <Typography>{claim.patient_name || '-'}</Typography>
