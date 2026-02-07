@@ -162,3 +162,23 @@ export async function seedCapital(amountCents, currency = 'USD') {
     body: JSON.stringify({ amount_cents: amountCents, currency })
   })
 }
+
+export async function getApplications(statusFilter = null) {
+  const params = statusFilter ? `?status_filter=${encodeURIComponent(statusFilter)}` : ''
+  return request(`/internal/applications${params}`)
+}
+
+export async function getApplication(applicationId) {
+  return request(`/internal/applications/${applicationId}`)
+}
+
+export async function reviewApplication(applicationId, action, reviewNotes = null) {
+  return request(`/internal/applications/${applicationId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ action, review_notes: reviewNotes })
+  })
+}
+
+export async function getApplicationStats() {
+  return request('/internal/applications/stats')
+}

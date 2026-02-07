@@ -1,6 +1,6 @@
 # Spoonbill Internal System of Record
 
-Phase 1 & 2 implementation of the Spoonbill claim lifecycle management system with authentication, underwriting, audit trail, and multi-tenant Practice Portal.
+Phase 1-4 implementation of the Spoonbill claim lifecycle management system with authentication, underwriting, audit trail, multi-tenant Practice Portal, payments, and practice onboarding.
 
 ## Quick Start
 
@@ -455,3 +455,125 @@ pytest tests/test_tenant_isolation.py -v
 - **Theme Parity**: Internal Console now uses the same light theme (ChatGPT colorway) as Practice Portal
 - **Role Badge**: Both UIs display the current user's role (Admin/Ops/Practice Manager)
 - **Claim Token Display**: Claim tokens shown in list views and detail dialogs
+
+## Phase 4: Practice Onboarding
+
+Phase 4 introduces a pre-account onboarding and underwriting intake flow for practices. This flow occurs BEFORE username/password creation and BEFORE Practice Portal access.
+
+### Onboarding Flow Overview
+
+1. **Practice applies** via public intake form (no authentication required)
+2. **Application submitted** with status SUBMITTED
+3. **Ops reviews** application in Internal Console
+4. **On approval**: Practice and Practice Manager user created automatically
+5. **On decline**: Application closed, no accounts created
+
+### Starting the Intake Form
+
+```bash
+cd spoonbill-intake-frontend
+npm install
+npm run dev
+```
+
+Access the public intake form at: http://localhost:5175
+
+### Application Statuses
+
+- **SUBMITTED**: Application received, awaiting review
+- **NEEDS_INFO**: Ops requested additional information from applicant
+- **APPROVED**: Application approved, practice and manager created
+- **DECLINED**: Application rejected, no accounts created
+
+### Public Intake API
+
+```bash
+# Submit a practice application (no auth required)
+curl -X POST http://localhost:8000/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "legal_name": "Downtown Family Dentistry",
+    "address": "123 Main St, Suite 100, Anytown, ST 12345",
+    "phone": "555-123-4567",
+    "practice_type": "GENERAL_DENTISTRY",
+    "years_in_operation": 5,
+    "provider_count": 3,
+    "operatory_count": 6,
+    "avg_monthly_collections_range": "$100,000 - $250,000",
+    "insurance_vs_self_pay_mix": "75% Insurance / 25% Self-Pay",
+    "billing_model": "IN_HOUSE",
+    "urgency_level": "MEDIUM",
+    "contact_name": "Jane Smith",
+    "contact_email": "jane@downtown-dental.com"
+  }'
+
+# Check application status (requires application ID and email)
+curl "http://localhost:8000/apply/status/1?email=jane@downtown-dental.com"
+```
+
+### Internal Ops Review API
+
+```bash
+# List all applications (requires Spoonbill role)
+curl http://localhost:8000/internal/applications \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get application details
+curl http://localhost:8000/internal/applications/1 \
+  -H "Authorization: Bearer $TOKEN"
+
+# Approve application (creates practice + manager)
+curl -X POST http://localhost:8000/internal/applications/1/review \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "APPROVE", "review_notes": "Verified practice information"}'
+
+# Request more information
+curl -X POST http://localhost:8000/internal/applications/1/review \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "NEEDS_INFO", "review_notes": "Please provide tax ID"}'
+
+# Decline application
+curl -X POST http://localhost:8000/internal/applications/1/review \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "DECLINE", "review_notes": "Does not meet minimum requirements"}'
+```
+
+### Approval Flow Details
+
+When an application is approved:
+
+1. A new Practice is created with the legal name from the application
+2. A new PRACTICE_MANAGER user is created with the contact email
+3. A temporary password is generated and returned in the API response
+4. The application is linked to the created practice for audit purposes
+5. Audit events are logged for application approval, practice creation, and user creation
+
+The temporary password must be securely shared with the practice manager. They can then log into the Practice Portal at http://localhost:5174.
+
+### Internal Console Applications Queue
+
+The Internal Console now has an "Applications" tab that shows:
+
+- All practice applications sorted by urgency (CRITICAL first) then by submission date
+- Quick view of application status, urgency, and contact info
+- Detailed review dialog with full application data
+- Approve/Decline/Request Info actions with optional notes
+
+### Application Fields
+
+The intake form collects comprehensive practice information:
+
+**Practice Information**: Legal name, address, phone, website, tax ID, practice type
+
+**Operations**: Years in operation, provider count, operatory count
+
+**Financial**: Monthly collections range, insurance vs self-pay mix, top payers, average AR days
+
+**Billing**: Billing model (in-house/outsourced/hybrid), follow-up frequency, practice management software, claims per month, electronic claims
+
+**Application Details**: Stated goal, urgency level
+
+**Contact**: Name, email, phone (this person becomes the Practice Manager)

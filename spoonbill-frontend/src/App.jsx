@@ -23,8 +23,10 @@ import LoginPage from './components/LoginPage.jsx'
 import ClaimsList from './components/ClaimsList.jsx'
 import ClaimDetailDialog from './components/ClaimDetailDialog.jsx'
 import CreateClaimDialog from './components/CreateClaimDialog.jsx'
+import ApplicationsQueue from './components/ApplicationsQueue.jsx'
 
 const STATUSES = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED']
+const MAIN_TABS = ['Claims', 'Applications']
 
 export default function App() {
   const [user, setUser] = React.useState(null)
@@ -35,6 +37,7 @@ export default function App() {
   const [detailOpen, setDetailOpen] = React.useState(false)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState(0)
+  const [mainTab, setMainTab] = React.useState(0)
   const [loadingClaimId, setLoadingClaimId] = React.useState(null)
 
   const refresh = React.useCallback(async () => {
@@ -163,24 +166,40 @@ export default function App() {
             </Stack>
           </Stack>
 
-          {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+                    {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
-              {STATUSES.map((status) => (
-                <Tab 
-                  key={status} 
-                  label={`${status.replace('_', ' ')} (${claimCounts[status]})`}
-                />
-              ))}
-            </Tabs>
-          </Box>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                      <Tabs value={mainTab} onChange={(e, v) => setMainTab(v)}>
+                        {MAIN_TABS.map((tab) => (
+                          <Tab key={tab} label={tab} />
+                        ))}
+                      </Tabs>
+                    </Box>
 
-          <ClaimsList
-            claims={filteredClaims}
-            onOpenClaim={openClaimDetail}
-            loadingClaimId={loadingClaimId}
-          />
+                    {mainTab === 0 && (
+                      <>
+                        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                          <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
+                            {STATUSES.map((status) => (
+                              <Tab 
+                                key={status} 
+                                label={`${status.replace('_', ' ')} (${claimCounts[status]})`}
+                              />
+                            ))}
+                          </Tabs>
+                        </Box>
+
+                        <ClaimsList
+                          claims={filteredClaims}
+                          onOpenClaim={openClaimDetail}
+                          loadingClaimId={loadingClaimId}
+                        />
+                      </>
+                    )}
+
+                    {mainTab === 1 && (
+                      <ApplicationsQueue />
+                    )}
         </Stack>
 
         <ClaimDetailDialog
