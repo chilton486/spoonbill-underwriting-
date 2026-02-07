@@ -69,12 +69,6 @@ class LedgerEntry(Base):
     
     account = relationship("LedgerAccount", back_populates="entries")
     claim = relationship("Claim", back_populates="ledger_entries")
-    payment_intent = relationship(
-        "PaymentIntent",
-        primaryjoin="and_(LedgerEntry.related_type=='PAYMENT_INTENT', foreign(LedgerEntry.related_id)==PaymentIntent.id)",
-        back_populates="ledger_entries",
-        viewonly=True,
-    )
 
     __table_args__ = (
         CheckConstraint("amount_cents > 0", name="ck_ledger_entry_amount_positive"),

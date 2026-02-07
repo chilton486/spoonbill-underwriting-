@@ -57,7 +57,6 @@ class PaymentIntent(Base):
     
     claim = relationship("Claim", back_populates="payment_intent")
     practice = relationship("Practice", back_populates="payment_intents")
-    ledger_entries = relationship("LedgerEntry", back_populates="payment_intent")
 
     @staticmethod
     def generate_idempotency_key(claim_id: int) -> str:
