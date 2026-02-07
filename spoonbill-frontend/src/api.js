@@ -134,3 +134,31 @@ export async function activateUser(userId) {
     method: 'PATCH'
   })
 }
+
+export async function getPaymentForClaim(claimId) {
+  return request(`/api/payments/claim/${claimId}`)
+}
+
+export async function processPayment(claimId) {
+  return request('/api/payments/process', {
+    method: 'POST',
+    body: JSON.stringify({ claim_id: claimId })
+  })
+}
+
+export async function retryPayment(paymentId) {
+  return request(`/api/payments/${paymentId}/retry`, {
+    method: 'POST'
+  })
+}
+
+export async function getLedgerSummary(currency = 'USD') {
+  return request(`/api/payments/ledger/summary?currency=${encodeURIComponent(currency)}`)
+}
+
+export async function seedCapital(amountCents, currency = 'USD') {
+  return request('/api/payments/ledger/seed', {
+    method: 'POST',
+    body: JSON.stringify({ amount_cents: amountCents, currency })
+  })
+}

@@ -16,7 +16,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
-import { getClaim, listDocuments, uploadDocument, getDocumentDownloadUrl, getAuthToken } from '../api';
+import { getClaim, listDocuments, uploadDocument, getDocumentDownloadUrl, getAuthToken, getPaymentStatus } from '../api';
 
 const statusColors = {
   NEW: 'default',
@@ -31,18 +31,21 @@ const statusColors = {
 function ClaimDetail({ claimId, open, onClose }) {
   const [claim, setClaim] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [payment, setPayment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [claimData, docsData] = await Promise.all([
+      const [claimData, docsData, paymentData] = await Promise.all([
         getClaim(claimId),
         listDocuments(claimId),
+        getPaymentStatus(claimId).catch(() => null),
       ]);
       setClaim(claimData);
       setDocuments(docsData);
+      setPayment(paymentData);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -247,6 +250,55 @@ function ClaimDetail({ claimId, open, onClose }) {
           </List>
         ) : (
           <Typography color="text.secondary">No documents uploaded yet.</Typography>
+        )}
+
+        {payment && (
+          <>
+            <Divider sx={{ my: 2 }} />
+
+            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+              Payment Status
+            </Typography>
+            <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderRadius: 1 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Status</Typography>
+                  <Box>
+                    <Chip
+                      label={payment.status}
+                      size="small"
+                      color={payment.status === 'CONFIRMED' ? 'success' : payment.status === 'FAILED' ? 'error' : 'warning'}
+                    />
+                  </Box>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Amount</Typography>
+                  <Typography>{formatAmount(payment.amount_cents)}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Provider</Typography>
+                  <Typography>{payment.provider}</Typography>
+                </Box>
+                {payment.provider_reference && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Reference</Typography>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>{payment.provider_reference}</Typography>
+                  </Box>
+                )}
+                {payment.confirmed_at && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Confirmed</Typography>
+                    <Typography>{formatDate(payment.confirmed_at)}</Typography>
+                  </Box>
+                )}
+              </Box>
+              {payment.failure_code && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {payment.failure_code}: {payment.failure_message}
+                </Alert>
+              )}
+            </Box>
+          </>
         )}
 
         <Divider sx={{ my: 2 }} />

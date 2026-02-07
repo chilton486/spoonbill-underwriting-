@@ -23,3 +23,5 @@ class Practice(Base):
     users = relationship("User", back_populates="practice")
     claims = relationship("Claim", back_populates="practice")
     documents = relationship("ClaimDocument", back_populates="practice")
+    payment_intents = relationship("PaymentIntent", back_populates="practice")
+    ledger_accounts = relationship("LedgerAccount", back_populates="practice")
