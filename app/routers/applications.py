@@ -10,9 +10,9 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 
 from ..database import get_db
+from ..services.auth import AuthService
 from ..models.practice_application import PracticeApplication, ApplicationStatus
 from ..models.practice import Practice, PracticeStatus
 from ..models.user import User, UserRole
@@ -28,8 +28,6 @@ from ..services.audit import AuditService
 from .auth import require_spoonbill_role
 
 router = APIRouter(tags=["applications"])
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def generate_temporary_password(length: int = 16) -> str:
@@ -356,7 +354,7 @@ def _approve_application(
     # Create the practice manager user
     manager = User(
         email=application.contact_email,
-        password_hash=pwd_context.hash(temp_password),
+        password_hash=AuthService.get_password_hash(temp_password),
         role=UserRole.PRACTICE_MANAGER.value,
         practice_id=practice.id,
         is_active=True,
