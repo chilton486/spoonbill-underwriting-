@@ -1,7 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router
+from .database import get_db
+from .config import get_settings
+
+settings = get_settings()
 
 app = FastAPI(
     title="Spoonbill Internal System of Record",
@@ -11,12 +17,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:3000",
-    ],
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,6 +31,23 @@ app.include_router(payments_router)
 app.include_router(applications_router)
 
 
+@app.get("/")
+def root():
+    """Root endpoint - confirms API is running."""
+    return {"status": "ok", "service": "spoonbill-api"}
+
+
 @app.get("/health")
-def health_check():
-    return {"status": "healthy", "version": "4.0.0"}
+def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint with database connectivity verification."""
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
+    
+    return {
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "version": "4.0.0",
+        "database": db_status,
+    }

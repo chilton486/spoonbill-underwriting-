@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -15,9 +16,34 @@ class Settings(BaseSettings):
     admin_email: str = "admin@spoonbill.com"
     admin_password: str = "changeme123"
     
+    # CORS configuration - comma-separated list of allowed origins
+    # Example: "https://console.example.com,https://portal.example.com"
+    cors_allowed_origins: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+    
+    def get_cors_origins(self) -> list[str]:
+        """Get list of CORS allowed origins, combining defaults with env var."""
+        # Default local development origins
+        default_origins = [
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:5175",
+            "http://localhost:3000",
+        ]
+        
+        if self.cors_allowed_origins:
+            # Parse comma-separated origins from env var
+            extra_origins = [
+                origin.strip() 
+                for origin in self.cors_allowed_origins.split(",") 
+                if origin.strip()
+            ]
+            return default_origins + extra_origins
+        
+        return default_origins
 
 
 @lru_cache()
