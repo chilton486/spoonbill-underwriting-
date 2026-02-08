@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 
 from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router
 from .database import get_db
+from .config import get_settings
+
+settings = get_settings()
 
 app = FastAPI(
     title="Spoonbill Internal System of Record",
@@ -14,12 +17,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:3000",
-    ],
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

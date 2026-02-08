@@ -602,3 +602,141 @@ The intake form collects comprehensive practice information:
 **Application Details**: Stated goal, urgency level
 
 **Contact**: Name, email, phone (this person becomes the Practice Manager)
+
+## Deploying to Render (Staging)
+
+This section covers deploying Spoonbill to Render with the backend API and all three frontend applications.
+
+### Prerequisites
+
+- A Render account
+- The backend API already deployed (or use the render.yaml blueprint)
+
+### Backend API Deployment
+
+If not already deployed, create a new Web Service on Render:
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | (leave empty) |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Health Check Path | `/health` |
+
+**Required Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string (from Render PostgreSQL) |
+| `JWT_SECRET_KEY` | Secure random string for JWT signing |
+| `ADMIN_EMAIL` | Initial admin email |
+| `ADMIN_PASSWORD` | Initial admin password |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated list of frontend URLs (see below) |
+
+### Frontend Deployments
+
+Deploy each frontend as a Render Static Site:
+
+#### Internal Console (spoonbill-frontend)
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | `spoonbill-frontend` |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
+
+**Environment Variables:**
+
+| Variable | Value |
+|----------|-------|
+| `VITE_API_BASE_URL` | `https://your-backend-api.onrender.com` |
+
+**Rewrite Rules** (for SPA routing):
+- Source: `/*`
+- Destination: `/index.html`
+
+#### Practice Portal (spoonbill-practice-frontend)
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | `spoonbill-practice-frontend` |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
+
+**Environment Variables:**
+
+| Variable | Value |
+|----------|-------|
+| `VITE_API_BASE_URL` | `https://your-backend-api.onrender.com` |
+
+**Rewrite Rules** (for SPA routing):
+- Source: `/*`
+- Destination: `/index.html`
+
+#### Intake Frontend (spoonbill-intake-frontend)
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | `spoonbill-intake-frontend` |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
+
+**Environment Variables:**
+
+| Variable | Value |
+|----------|-------|
+| `VITE_API_BASE_URL` | `https://your-backend-api.onrender.com` |
+
+**Rewrite Rules** (for SPA routing):
+- Source: `/*`
+- Destination: `/index.html`
+
+### Configuring CORS
+
+After deploying the frontends, update the backend's `CORS_ALLOWED_ORIGINS` environment variable with the deployed frontend URLs:
+
+```
+CORS_ALLOWED_ORIGINS=https://spoonbill-console.onrender.com,https://spoonbill-portal.onrender.com,https://spoonbill-intake.onrender.com
+```
+
+The backend automatically includes localhost origins for local development, so you only need to add the production/staging URLs.
+
+### Using render.yaml Blueprint
+
+Alternatively, you can use the included `render.yaml` blueprint to deploy all services at once:
+
+1. Go to Render Dashboard → Blueprints
+2. Connect your repository
+3. Render will detect `render.yaml` and create all services
+4. Set the required environment variables for each service
+
+The blueprint defines:
+- `spoonbill-api`: Backend web service
+- `spoonbill-console`: Internal Console static site
+- `spoonbill-portal`: Practice Portal static site
+- `spoonbill-intake`: Intake Frontend static site
+- `spoonbill-db`: PostgreSQL database
+
+### Verifying Deployment
+
+After deployment, verify the services are running:
+
+```bash
+# Check backend health
+curl https://your-backend-api.onrender.com/
+# Expected: {"status":"ok","service":"spoonbill-api"}
+
+curl https://your-backend-api.onrender.com/health
+# Expected: {"status":"healthy","version":"4.0.0","database":"connected"}
+
+# Check API docs
+# Open: https://your-backend-api.onrender.com/docs
+```
+
+### Troubleshooting
+
+**CORS errors**: Ensure `CORS_ALLOWED_ORIGINS` includes the exact frontend URLs (no trailing slashes).
+
+**API not found**: Verify `VITE_API_BASE_URL` is set correctly in each frontend's environment variables. The value must be set at build time (Vite embeds it during build).
+
+**Database connection errors**: Check that `DATABASE_URL` is correctly set and the database is accessible from the backend service.

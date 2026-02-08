@@ -1,0 +1,75 @@
+# Render Blueprint for Spoonbill
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API Service
+  - type: web
+    name: spoonbill-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: spoonbill-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+    healthCheckPath: /health
+
+  # Internal Console (Spoonbill Ops UI)
+  - type: web
+    name: spoonbill-console
+    runtime: static
+    rootDir: spoonbill-frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # Practice Portal (Practice Manager UI)
+  - type: web
+    name: spoonbill-portal
+    runtime: static
+    rootDir: spoonbill-practice-frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # Intake Frontend (Public Application Form)
+  - type: web
+    name: spoonbill-intake
+    runtime: static
+    rootDir: spoonbill-intake-frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: spoonbill-db
+    plan: free
+    databaseName: spoonbill
+    user: spoonbill
