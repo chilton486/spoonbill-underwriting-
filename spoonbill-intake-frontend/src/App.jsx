@@ -29,7 +29,19 @@ const theme = createTheme({
   },
 });
 
-const API_BASE = 'http://localhost:8000';
+// API base URL - read from environment variable, fallback to localhost for local dev
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// Practice Portal URL - for redirect after password set
+const PRACTICE_PORTAL_URL = import.meta.env.VITE_PRACTICE_PORTAL_URL || 'http://localhost:5174';
+
+// Warn if VITE_API_BASE_URL is not set in production
+if (import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL) {
+  console.warn(
+    '[Spoonbill Intake] VITE_API_BASE_URL is not set. API calls will fail in production. ' +
+    'Set VITE_API_BASE_URL to your backend URL and rebuild.'
+  );
+}
 
 const steps = ['Practice Info', 'Operations', 'Financial', 'Billing', 'Contact'];
 
@@ -513,7 +525,7 @@ function SetPasswordPage() {
             </Typography>
             <Button
               variant="contained"
-              href="http://localhost:5174"
+              href={PRACTICE_PORTAL_URL}
               target="_blank"
             >
               Go to Practice Portal
