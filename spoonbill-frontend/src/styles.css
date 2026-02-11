@@ -4,7 +4,5 @@ html, body {
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 600px at 20% 0%, rgba(56, 189, 248, 0.12), transparent 60%),
-              radial-gradient(900px 500px at 80% 0%, rgba(167, 139, 250, 0.12), transparent 60%),
-              #0b1220;
+  background: #ffffff;
 }

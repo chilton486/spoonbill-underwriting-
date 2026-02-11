@@ -796,3 +796,34 @@ curl https://your-backend-api.onrender.com/health
 **API not found**: Verify `VITE_API_BASE_URL` is set correctly in each frontend's environment variables. The value must be set at build time (Vite embeds it during build).
 
 **Database connection errors**: Check that `DATABASE_URL` is correctly set and the database is accessible from the backend service.
+
+## Internal Console Theme
+
+The Internal Console uses a black-and-white ChatGPT-style theme for maximum readability. The theme is defined in `spoonbill-frontend/src/theme.js` with the following design principles:
+
+- **White background** (#ffffff) for all surfaces
+- **Black text** (#000000) for primary content
+- **Gray text** (#6b7280) for secondary/muted content
+- **Light gray borders** (#e5e7eb) for subtle separation
+- **High contrast buttons**: Black background with white text for primary actions
+- **Outlined buttons**: White background with black border for secondary actions
+- **Status badges**: Use pastel backgrounds with dark text and borders for accessibility
+
+### Visual Regression Checklist
+
+After making theme changes, verify the following pages render correctly with high contrast and readability:
+
+1. **Login Page**: White card on white background, black text, visible input borders
+2. **Claims List**: Table headers visible, row hover states work, status chips readable
+3. **Claim Detail Dialog**: All sections readable, buttons visible, audit trail table clear
+4. **Applications Tab**: Application list table readable, status/urgency chips visible
+5. **Practices Tab**: Practice list table readable, invite status visible, copy buttons work
+6. **Practice Detail Dialog**: Manager list visible, invite history table readable
+7. **Search Functionality**: Search input visible, results display correctly
+8. **Alerts/Notifications**: Success/error/warning alerts have proper contrast
+
+Key accessibility checks:
+- No gray-on-gray text (all text should have sufficient contrast)
+- Disabled states are still legible (not invisible)
+- Focus outlines are visible for keyboard navigation
+- All buttons and interactive elements are clearly identifiable

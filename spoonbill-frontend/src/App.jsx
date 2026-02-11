@@ -10,6 +10,7 @@ import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import { ThemeProvider } from '@mui/material/styles'
+import CssBaseline from '@mui/material/CssBaseline'
 
 import { theme } from './theme.js'
 import TextField from '@mui/material/TextField'
@@ -141,28 +142,31 @@ export default function App() {
     return counts
   }, [claims])
 
-  if (loading) {
+    if (loading) {
+      return (
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
+            <CircularProgress />
+            <Typography sx={{ mt: 2 }}>Loading...</Typography>
+          </Container>
+        </ThemeProvider>
+      )
+    }
+
+    if (!user) {
+      return (
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <LoginPage onLogin={handleLogin} />
+        </ThemeProvider>
+      )
+    }
+
     return (
       <ThemeProvider theme={theme}>
-        <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
-          <CircularProgress />
-          <Typography sx={{ mt: 2 }}>Loading...</Typography>
-        </Container>
-      </ThemeProvider>
-    )
-  }
-
-  if (!user) {
-    return (
-      <ThemeProvider theme={theme}>
-        <LoginPage onLogin={handleLogin} />
-      </ThemeProvider>
-    )
-  }
-
-  return (
-    <ThemeProvider theme={theme}>
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <CssBaseline />
+        <Container maxWidth="xl" sx={{ py: 4 }}>
         <Stack spacing={3}>
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <Stack spacing={0.5}>
