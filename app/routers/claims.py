@@ -2,10 +2,12 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from ..database import get_db
 from ..models.claim import Claim, ClaimStatus
 from ..models.user import User
+from ..models.practice import Practice
 from ..schemas.claim import ClaimCreate, ClaimUpdate, ClaimResponse, ClaimListResponse, ClaimTransitionRequest
 from ..services.audit import AuditService
 from ..services.underwriting import UnderwritingService
@@ -75,14 +77,48 @@ def create_claim(
 def list_claims(
     status: Optional[str] = Query(None, description="Filter by status"),
     practice_id: Optional[int] = Query(None, description="Filter by practice ID"),
+    q: Optional[str] = Query(None, description="Search by claim ID, claim token, patient name, payer, or practice name"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_spoonbill_user),
 ):
+    """
+    List claims with optional filtering and search.
+    
+    Search (q parameter) matches against:
+    - Claim ID (exact match if numeric)
+    - Claim token (partial match)
+    - Patient name (partial match, case-insensitive)
+    - Payer (partial match, case-insensitive)
+    - Practice name (partial match, case-insensitive)
+    """
     query = db.query(Claim)
     if status:
         query = query.filter(Claim.status == status)
     if practice_id:
         query = query.filter(Claim.practice_id == practice_id)
+    
+    if q:
+        search_term = f"%{q}%"
+        # Build search conditions
+        search_conditions = [
+            Claim.patient_name.ilike(search_term),
+            Claim.payer.ilike(search_term),
+            Claim.claim_token.ilike(search_term),
+            Claim.external_claim_id.ilike(search_term),
+        ]
+        
+        # Add exact ID match if search term is numeric
+        if q.isdigit():
+            search_conditions.append(Claim.id == int(q))
+        
+        # Add practice name search via join
+        practice_ids_with_matching_name = db.query(Practice.id).filter(
+            Practice.name.ilike(search_term)
+        ).subquery()
+        search_conditions.append(Claim.practice_id.in_(practice_ids_with_matching_name))
+        
+        query = query.filter(or_(*search_conditions))
+    
     query = query.order_by(Claim.created_at.desc())
     return query.all()
 

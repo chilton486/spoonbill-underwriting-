@@ -12,11 +12,16 @@ import Chip from '@mui/material/Chip'
 import { ThemeProvider } from '@mui/material/styles'
 
 import { theme } from './theme.js'
+import TextField from '@mui/material/TextField'
+import InputAdornment from '@mui/material/InputAdornment'
+import SearchIcon from '@mui/icons-material/Search'
+
 import {
   getClaims,
   getCurrentUser,
   getAuthToken,
   logout,
+  searchClaims,
 } from './api.js'
 
 import LoginPage from './components/LoginPage.jsx'
@@ -24,9 +29,10 @@ import ClaimsList from './components/ClaimsList.jsx'
 import ClaimDetailDialog from './components/ClaimDetailDialog.jsx'
 import CreateClaimDialog from './components/CreateClaimDialog.jsx'
 import ApplicationsQueue from './components/ApplicationsQueue.jsx'
+import PracticesList from './components/PracticesList.jsx'
 
 const STATUSES = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED']
-const MAIN_TABS = ['Claims', 'Applications']
+const MAIN_TABS = ['Claims', 'Applications', 'Practices']
 
 export default function App() {
   const [user, setUser] = React.useState(null)
@@ -39,10 +45,12 @@ export default function App() {
   const [activeTab, setActiveTab] = React.useState(0)
   const [mainTab, setMainTab] = React.useState(0)
   const [loadingClaimId, setLoadingClaimId] = React.useState(null)
+  const [claimSearchInput, setClaimSearchInput] = React.useState('')
+  const [claimSearchQuery, setClaimSearchQuery] = React.useState('')
 
-  const refresh = React.useCallback(async () => {
+  const refresh = React.useCallback(async (query = null) => {
     try {
-      const allClaims = await getClaims()
+      const allClaims = query ? await searchClaims(query) : await getClaims()
       setClaims(allClaims)
     } catch (e) {
       if (e.status === 401) {
@@ -53,6 +61,21 @@ export default function App() {
       }
     }
   }, [])
+
+  // Debounced claim search
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setClaimSearchQuery(claimSearchInput)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [claimSearchInput])
+
+  // Refresh claims when search query changes
+  React.useEffect(() => {
+    if (user) {
+      refresh(claimSearchQuery || null)
+    }
+  }, [claimSearchQuery, user, refresh])
 
   React.useEffect(() => {
     let mounted = true
@@ -178,19 +201,48 @@ export default function App() {
 
                     {mainTab === 0 && (
                       <>
-                        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                          <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
-                            {STATUSES.map((status) => (
-                              <Tab 
-                                key={status} 
-                                label={`${status.replace('_', ' ')} (${claimCounts[status]})`}
-                              />
-                            ))}
-                          </Tabs>
-                        </Box>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                          <Box sx={{ flex: 1 }} />
+                          <TextField
+                            size="small"
+                            placeholder="Search claims by ID, token, patient, payer, practice..."
+                            value={claimSearchInput}
+                            onChange={(e) => setClaimSearchInput(e.target.value)}
+                            sx={{ width: 400 }}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <SearchIcon sx={{ color: 'text.secondary' }} />
+                                </InputAdornment>
+                              ),
+                            }}
+                          />
+                        </Stack>
+
+                        {!claimSearchQuery && (
+                          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                            <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
+                              {STATUSES.map((status) => (
+                                <Tab 
+                                  key={status} 
+                                  label={`${status.replace('_', ' ')} (${claimCounts[status]})`}
+                                />
+                              ))}
+                            </Tabs>
+                          </Box>
+                        )}
+
+                        {claimSearchQuery && (
+                          <Alert severity="info" sx={{ mb: 2 }}>
+                            Showing {claims.length} result(s) for "{claimSearchQuery}"
+                            <Button size="small" sx={{ ml: 2 }} onClick={() => { setClaimSearchInput(''); setClaimSearchQuery(''); }}>
+                              Clear search
+                            </Button>
+                          </Alert>
+                        )}
 
                         <ClaimsList
-                          claims={filteredClaims}
+                          claims={claimSearchQuery ? claims : filteredClaims}
                           onOpenClaim={openClaimDetail}
                           loadingClaimId={loadingClaimId}
                         />
@@ -199,6 +251,10 @@ export default function App() {
 
                     {mainTab === 1 && (
                       <ApplicationsQueue />
+                    )}
+
+                    {mainTab === 2 && (
+                      <PracticesList />
                     )}
         </Stack>
 

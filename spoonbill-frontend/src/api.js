@@ -182,3 +182,34 @@ export async function reviewApplication(applicationId, action, reviewNotes = nul
 export async function getApplicationStats() {
   return request('/internal/applications/stats')
 }
+
+// Practices API
+export async function getPractices(searchQuery = null) {
+  const params = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : ''
+  return request(`/api/practices${params}`)
+}
+
+export async function getPractice(practiceId) {
+  return request(`/api/practices/${practiceId}`)
+}
+
+export async function getPracticeInvites(practiceId) {
+  return request(`/api/practices/${practiceId}/invites`)
+}
+
+export async function reissueInvite(practiceId, userId = null) {
+  const params = userId ? `?user_id=${userId}` : ''
+  return request(`/api/practices/${practiceId}/invites/reissue${params}`, {
+    method: 'POST'
+  })
+}
+
+// Search API
+export async function searchClaims(query, status = null, practiceId = null) {
+  const params = new URLSearchParams()
+  if (query) params.append('q', query)
+  if (status) params.append('status', status)
+  if (practiceId) params.append('practice_id', practiceId)
+  const queryString = params.toString()
+  return request(`/api/claims${queryString ? '?' + queryString : ''}`)
+}
