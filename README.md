@@ -603,6 +603,62 @@ The intake form collects comprehensive practice information:
 
 **Contact**: Name, email, phone (this person becomes the Practice Manager)
 
+## Internal Console: Practices Tab + Invite Management + Search
+
+The Internal Console now includes enhanced features for managing practices and searching claims.
+
+### Practices Tab
+
+The new "Practices" tab in the Internal Console provides:
+
+- **Practice List**: View all approved practices with summary info (name, status, claim count, primary manager email)
+- **Active Invite Status**: See at a glance which practices have active invite links
+- **Copy Invite Link**: One-click copy of the active invite link for sharing with practice managers
+- **Practice Detail View**: Full practice details including all managers and complete invite history
+- **Reissue Invite**: Generate a new invite link (automatically expires any existing active invites)
+
+### Practices API Endpoints
+
+```bash
+# List all practices (requires Spoonbill role)
+curl http://localhost:8000/api/practices \
+  -H "Authorization: Bearer $TOKEN"
+
+# Search practices by name, ID, or manager email
+curl "http://localhost:8000/api/practices?q=downtown" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get practice details with managers and invite history
+curl http://localhost:8000/api/practices/1 \
+  -H "Authorization: Bearer $TOKEN"
+
+# List all invites for a practice
+curl http://localhost:8000/api/practices/1/invites \
+  -H "Authorization: Bearer $TOKEN"
+
+# Reissue invite (expires old invites, creates new one)
+curl -X POST http://localhost:8000/api/practices/1/invites/reissue \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Claims Search
+
+The Claims tab now includes a search bar that searches across:
+
+- Claim ID (exact match)
+- Claim token (partial match)
+- Patient name (case-insensitive)
+- Payer (case-insensitive)
+- Practice name (case-insensitive)
+
+When searching, the status filter tabs are hidden and all matching claims are shown. Clear the search to return to the filtered view.
+
+### Audit Events
+
+New audit events for invite management:
+
+- `PRACTICE_INVITE_REISSUED`: Logged when an invite is reissued, includes practice ID, user email, and count of expired invites
+
 ## Deploying to Render (Staging)
 
 This section covers deploying Spoonbill to Render with the backend API and all three frontend applications.
