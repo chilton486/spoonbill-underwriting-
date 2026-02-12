@@ -169,3 +169,29 @@ export const getPaymentStatus = async (claimId) => {
 
   return response.json();
 };
+
+export const validateInviteToken = async (token) => {
+  const response = await fetch(`${API_BASE_URL}/invite/${token}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Invalid or expired invite link.');
+  }
+
+  return response.json();
+};
+
+export const setPassword = async (token, password) => {
+  const response = await fetch(`${API_BASE_URL}/set-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to set password.');
+  }
+
+  return response.json();
+};

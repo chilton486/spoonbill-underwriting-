@@ -21,6 +21,10 @@ services:
         sync: false
       - key: CORS_ALLOWED_ORIGINS
         sync: false
+      - key: PRACTICE_PORTAL_BASE_URL
+        sync: false
+      - key: INTAKE_PORTAL_BASE_URL
+        sync: false
     healthCheckPath: /health
 
   # Internal Console (Spoonbill Ops UI)
@@ -32,6 +36,8 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_PRACTICE_PORTAL_URL
         sync: false
     routes:
       - type: rewrite

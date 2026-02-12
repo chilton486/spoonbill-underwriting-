@@ -61,7 +61,7 @@ function formatDateTime(dateString) {
 }
 
 function getInviteUrl(token) {
-  const baseUrl = import.meta.env.VITE_INTAKE_URL || 'http://localhost:5175';
+  const baseUrl = import.meta.env.VITE_PRACTICE_PORTAL_URL || 'http://localhost:5174';
   return `${baseUrl}/set-password/${token}`;
 }
 
