@@ -20,11 +20,15 @@ class Settings(BaseSettings):
     # Example: "https://console.example.com,https://portal.example.com"
     cors_allowed_origins: Optional[str] = None
     
-    # Intake frontend base URL for invite links
-    # Used to generate full invite URLs for practice manager onboarding
+    # Practice Portal base URL for invite links (set-password flow)
+    # Default: http://localhost:5174 (local dev)
+    # Staging: https://spoonbill-staging-portal.onrender.com
+    practice_portal_base_url: str = "http://localhost:5174"
+    
+    # Intake Portal base URL
     # Default: http://localhost:5175 (local dev)
     # Staging: https://spoonbill-staging-intake.onrender.com
-    intake_base_url: str = "http://localhost:5175"
+    intake_portal_base_url: str = "http://localhost:5175"
     
     class Config:
         env_file = ".env"

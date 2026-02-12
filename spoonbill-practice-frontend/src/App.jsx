@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -9,9 +10,10 @@ import LoginPage from './components/LoginPage';
 import ClaimsList from './components/ClaimsList';
 import ClaimDetail from './components/ClaimDetail';
 import SubmitClaimDialog from './components/SubmitClaimDialog';
+import SetPasswordPage from './components/SetPasswordPage';
 import { getCurrentUser, getAuthToken, logout, listClaims } from './api';
 
-function App() {
+function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [claims, setClaims] = useState([]);
@@ -173,6 +175,15 @@ function App() {
         />
       </Box>
     </Container>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/set-password/:token" element={<SetPasswordPage />} />
+      <Route path="*" element={<Dashboard />} />
+    </Routes>
   );
 }
 

@@ -148,7 +148,8 @@ class ApplicationApprovalResult(BaseModel):
     practice_id: int
     manager_user_id: int
     manager_email: str
-    invite_token: str  # One-time token for password setup (expires in 7 days)
+    invite_token: str
+    invite_url: str
     message: str
 
 

@@ -385,7 +385,7 @@ def reissue_invite(
     
     # Build full invite URL using configured base URL
     settings = get_settings()
-    invite_url = f"{settings.intake_base_url}/set-password/{new_token}"
+    invite_url = f"{settings.practice_portal_base_url}/set-password/{new_token}"
     
     return ReissueInviteResponse(
         invite_id=new_invite.id,

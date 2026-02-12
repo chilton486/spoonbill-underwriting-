@@ -84,8 +84,36 @@ Copy `.env.example` to `.env` and configure:
 | UNDERWRITING_AUTO_APPROVE_BELOW_CENTS | Auto-approve threshold | 10000 ($100) |
 | ADMIN_EMAIL | Initial admin email | admin@spoonbill.com |
 | ADMIN_PASSWORD | Initial admin password | changeme123 |
-| INTAKE_BASE_URL | Base URL for invite links (Intake frontend) | http://localhost:5175 |
+| PRACTICE_PORTAL_BASE_URL | Base URL for invite/set-password links (Practice Portal) | http://localhost:5174 |
+| INTAKE_PORTAL_BASE_URL | Base URL for Intake Portal | http://localhost:5175 |
 | CORS_ALLOWED_ORIGINS | Comma-separated list of allowed CORS origins | (none) |
+
+### Frontend Environment Variables
+
+Each frontend app has its own `.env.example`. Key variables:
+
+| App | Variable | Description | Default |
+|-----|----------|-------------|---------|
+| Internal Console | VITE_API_BASE_URL | Backend API URL | http://localhost:8000 |
+| Internal Console | VITE_PRACTICE_PORTAL_URL | Practice Portal URL (for invite links) | http://localhost:5174 |
+| Practice Portal | VITE_API_BASE_URL | Backend API URL | http://localhost:8000 |
+
+### Staging Environment
+
+For Render staging deployment, set the following env vars on the backend service:
+
+| Variable | Value |
+|----------|-------|
+| PRACTICE_PORTAL_BASE_URL | https://spoonbill-staging-portal.onrender.com |
+| INTAKE_PORTAL_BASE_URL | https://spoonbill-staging-intake.onrender.com |
+| CORS_ALLOWED_ORIGINS | https://spoonbill-staging-internal.onrender.com,https://spoonbill-staging-portal.onrender.com,https://spoonbill-staging-intake.onrender.com |
+
+For the Internal Console service, set:
+
+| Variable | Value |
+|----------|-------|
+| VITE_API_BASE_URL | https://spoonbill-staging-api.onrender.com |
+| VITE_PRACTICE_PORTAL_URL | https://spoonbill-staging-portal.onrender.com |
 
 ## Claim Lifecycle
 

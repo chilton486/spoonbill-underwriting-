@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..database import get_db
 from ..services.auth import AuthService
 from ..services.rate_limiter import application_rate_limiter
@@ -508,12 +509,16 @@ def _approve_application(
     
     db.commit()
     
+    settings = get_settings()
+    invite_url = f"{settings.practice_portal_base_url}/set-password/{invite_token}"
+    
     return ApplicationApprovalResult(
         application_id=application.id,
         practice_id=practice.id,
         manager_user_id=manager.id,
         manager_email=manager.email,
         invite_token=invite_token,
+        invite_url=invite_url,
         message=f"Application approved. Practice '{practice.name}' created. Share the invite link with the practice manager to set their password.",
     )
 
