@@ -47,10 +47,6 @@ function formatDate(dateString) {
   });
 }
 
-function getInviteUrl(token) {
-  const baseUrl = import.meta.env.VITE_INTAKE_URL || 'http://localhost:5175';
-  return `${baseUrl}/set-password/${token}`;
-}
 
 function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplete }) {
   const [application, setApplication] = React.useState(null);
@@ -126,14 +122,14 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
                   border: '1px solid #e5e7eb'
                 }}
               >
-                {getInviteUrl(approvalResult.invite_token)}
+                {approvalResult.invite_url}
               </Typography>
               <Button
                 size="small"
                 variant="outlined"
                 sx={{ mt: 1 }}
                 onClick={() => {
-                  navigator.clipboard.writeText(getInviteUrl(approvalResult.invite_token));
+                  navigator.clipboard.writeText(approvalResult.invite_url);
                 }}
               >
                 Copy Invite Link
