@@ -47,6 +47,11 @@ function formatDate(dateString) {
   });
 }
 
+function getInviteUrl(token) {
+  const baseUrl = import.meta.env.VITE_INTAKE_URL || 'http://localhost:5175';
+  return `${baseUrl}/set-password/${token}`;
+}
+
 function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplete }) {
   const [application, setApplication] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
@@ -121,14 +126,14 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
                   border: '1px solid #e5e7eb'
                 }}
               >
-                http://localhost:5175/set-password/{approvalResult.invite_token}
+                {getInviteUrl(approvalResult.invite_token)}
               </Typography>
               <Button
                 size="small"
                 variant="outlined"
                 sx={{ mt: 1 }}
                 onClick={() => {
-                  navigator.clipboard.writeText(`http://localhost:5175/set-password/${approvalResult.invite_token}`);
+                  navigator.clipboard.writeText(getInviteUrl(approvalResult.invite_token));
                 }}
               >
                 Copy Invite Link

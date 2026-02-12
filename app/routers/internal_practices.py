@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
 from ..database import get_db
+from ..config import get_settings
 from ..models.practice import Practice
 from ..models.user import User, UserRole
 from ..models.claim import Claim
@@ -382,8 +383,9 @@ def reissue_invite(
     
     db.commit()
     
-    # Build invite URL (will be configured via env var in production)
-    invite_url = f"/set-password/{new_token}"
+    # Build full invite URL using configured base URL
+    settings = get_settings()
+    invite_url = f"{settings.intake_base_url}/set-password/{new_token}"
     
     return ReissueInviteResponse(
         invite_id=new_invite.id,
