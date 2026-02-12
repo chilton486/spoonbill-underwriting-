@@ -37,8 +37,6 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         sync: false
-      - key: VITE_PRACTICE_PORTAL_URL
-        sync: false
     routes:
       - type: rewrite
         source: /*

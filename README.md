@@ -95,8 +95,9 @@ Each frontend app has its own `.env.example`. Key variables:
 | App | Variable | Description | Default |
 |-----|----------|-------------|---------|
 | Internal Console | VITE_API_BASE_URL | Backend API URL | http://localhost:8000 |
-| Internal Console | VITE_PRACTICE_PORTAL_URL | Practice Portal URL (for invite links) | http://localhost:5174 |
 | Practice Portal | VITE_API_BASE_URL | Backend API URL | http://localhost:8000 |
+
+Note: Invite URLs displayed in the Internal Console are returned by the backend API (not constructed client-side), so the console only needs the API URL.
 
 ### Staging Environment
 
@@ -113,7 +114,6 @@ For the Internal Console service, set:
 | Variable | Value |
 |----------|-------|
 | VITE_API_BASE_URL | https://spoonbill-staging-api.onrender.com |
-| VITE_PRACTICE_PORTAL_URL | https://spoonbill-staging-portal.onrender.com |
 
 ## Claim Lifecycle
 

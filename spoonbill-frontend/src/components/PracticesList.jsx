@@ -60,10 +60,6 @@ function formatDateTime(dateString) {
   });
 }
 
-function getInviteUrl(token) {
-  const baseUrl = import.meta.env.VITE_PRACTICE_PORTAL_URL || 'http://localhost:5174';
-  return `${baseUrl}/set-password/${token}`;
-}
 
 function PracticeDetailDialog({ open, onClose, practiceId, onInviteReissued }) {
   const [practice, setPractice] = React.useState(null);
@@ -143,13 +139,13 @@ function PracticeDetailDialog({ open, onClose, practiceId, onInviteReissued }) {
                   border: '1px solid #e5e7eb'
                 }}
               >
-                {getInviteUrl(reissueResult.token)}
+                {reissueResult.invite_url}
               </Typography>
               <Button
                 size="small"
                 variant="outlined"
                 sx={{ mt: 1 }}
-                onClick={() => copyToClipboard(getInviteUrl(reissueResult.token))}
+                onClick={() => copyToClipboard(reissueResult.invite_url)}
                 startIcon={<ContentCopyIcon />}
               >
                 {copied ? 'Copied!' : 'Copy Invite Link'}
@@ -247,13 +243,13 @@ function PracticeDetailDialog({ open, onClose, practiceId, onInviteReissued }) {
                       mb: 1
                     }}
                   >
-                    {getInviteUrl(activeInvite.token)}
+                    {activeInvite.invite_url}
                   </Typography>
                   <Stack direction="row" spacing={1}>
                     <Button
                       size="small"
                       variant="outlined"
-                      onClick={() => copyToClipboard(getInviteUrl(activeInvite.token))}
+                      onClick={() => copyToClipboard(activeInvite.invite_url)}
                       startIcon={<ContentCopyIcon />}
                     >
                       {copied ? 'Copied!' : 'Copy'}
@@ -359,7 +355,7 @@ export default function PracticesList() {
       const details = await getPractice(practice.id);
       const activeInvite = details.invites?.find(i => i.status === 'ACTIVE');
       if (activeInvite) {
-        navigator.clipboard.writeText(getInviteUrl(activeInvite.token));
+        navigator.clipboard.writeText(activeInvite.invite_url);
         setCopied(practice.id);
         setTimeout(() => setCopied(null), 2000);
       }

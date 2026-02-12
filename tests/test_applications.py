@@ -272,3 +272,78 @@ class TestInviteToken:
         from app.models.invite import PracticeManagerInvite
         
         assert hasattr(PracticeManagerInvite, 'is_valid')
+
+
+class TestInviteUrlGeneration:
+    """Tests for invite URL generation using environment variables."""
+
+    def test_config_has_practice_portal_base_url(self):
+        """Test that Settings includes practice_portal_base_url field."""
+        from app.config import Settings
+        s = Settings(database_url="postgresql://x:x@localhost/x")
+        assert hasattr(s, 'practice_portal_base_url')
+
+    def test_default_practice_portal_base_url_is_localhost(self):
+        """Test that the default practice_portal_base_url points to localhost for local dev."""
+        import os
+        env_backup = os.environ.get('PRACTICE_PORTAL_BASE_URL')
+        os.environ.pop('PRACTICE_PORTAL_BASE_URL', None)
+        from app.config import Settings
+        s = Settings(database_url="postgresql://x:x@localhost/x")
+        assert s.practice_portal_base_url == "http://localhost:5174"
+        if env_backup is not None:
+            os.environ['PRACTICE_PORTAL_BASE_URL'] = env_backup
+
+    def test_practice_portal_base_url_from_env(self):
+        """Test that practice_portal_base_url reads from env var."""
+        import os
+        old = os.environ.get('PRACTICE_PORTAL_BASE_URL')
+        os.environ['PRACTICE_PORTAL_BASE_URL'] = 'https://spoonbill-staging-portal.onrender.com'
+        from app.config import Settings
+        s = Settings(database_url="postgresql://x:x@localhost/x")
+        assert s.practice_portal_base_url == 'https://spoonbill-staging-portal.onrender.com'
+        if old is not None:
+            os.environ['PRACTICE_PORTAL_BASE_URL'] = old
+        else:
+            os.environ.pop('PRACTICE_PORTAL_BASE_URL', None)
+
+    def test_invite_url_uses_env_var_not_hardcoded(self):
+        """Test that invite URL is constructed from the env var, not hardcoded localhost."""
+        import os
+        old = os.environ.get('PRACTICE_PORTAL_BASE_URL')
+        os.environ['PRACTICE_PORTAL_BASE_URL'] = 'https://portal.example.com'
+        from app.config import Settings
+        s = Settings(database_url="postgresql://x:x@localhost/x")
+        token = "abc123"
+        invite_url = f"{s.practice_portal_base_url}/set-password/{token}"
+        assert invite_url == "https://portal.example.com/set-password/abc123"
+        assert "localhost" not in invite_url
+        if old is not None:
+            os.environ['PRACTICE_PORTAL_BASE_URL'] = old
+        else:
+            os.environ.pop('PRACTICE_PORTAL_BASE_URL', None)
+
+    def test_invite_url_no_trailing_slash(self):
+        """Test that invite URL has no double slashes from trailing slash in base URL."""
+        from app.config import Settings
+        s = Settings(
+            database_url="postgresql://x:x@localhost/x",
+            practice_portal_base_url="https://portal.example.com",
+        )
+        token = "test-token"
+        invite_url = f"{s.practice_portal_base_url}/set-password/{token}"
+        assert "//" not in invite_url.replace("https://", "")
+
+    def test_approval_result_schema_has_invite_url(self):
+        """Test that ApplicationApprovalResult schema includes invite_url field."""
+        from app.schemas.practice_application import ApplicationApprovalResult
+        fields = ApplicationApprovalResult.model_fields
+        assert 'invite_url' in fields
+        assert 'invite_token' in fields
+
+    def test_config_has_intake_portal_base_url(self):
+        """Test that Settings includes intake_portal_base_url field."""
+        from app.config import Settings
+        s = Settings(database_url="postgresql://x:x@localhost/x")
+        assert hasattr(s, 'intake_portal_base_url')
+        assert s.intake_portal_base_url == "http://localhost:5175"

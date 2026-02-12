@@ -48,6 +48,7 @@ class InviteResponse(BaseModel):
     user_id: int
     user_email: str
     token: str
+    invite_url: str
     status: str  # ACTIVE, USED, EXPIRED
     created_at: datetime
     expires_at: datetime
@@ -225,7 +226,8 @@ def get_practice(
         PracticeManagerInvite.user_id.in_(manager_ids)
     ).order_by(PracticeManagerInvite.created_at.desc()).all()
     
-    # Build invite responses with computed status
+    # Build invite responses with computed status and full URLs
+    settings = get_settings()
     invites = []
     for invite in invites_raw:
         user = next((m for m in managers if m.id == invite.user_id), None)
@@ -234,6 +236,7 @@ def get_practice(
             user_id=invite.user_id,
             user_email=user.email if user else "unknown",
             token=invite.token,
+            invite_url=f"{settings.practice_portal_base_url}/set-password/{invite.token}",
             status=get_invite_status(invite),
             created_at=invite.created_at,
             expires_at=invite.expires_at,
@@ -283,6 +286,7 @@ def list_practice_invites(
         PracticeManagerInvite.user_id.in_(manager_ids)
     ).order_by(PracticeManagerInvite.created_at.desc()).all()
     
+    settings = get_settings()
     invites = []
     for invite in invites_raw:
         user = next((m for m in managers if m.id == invite.user_id), None)
@@ -291,6 +295,7 @@ def list_practice_invites(
             user_id=invite.user_id,
             user_email=user.email if user else "unknown",
             token=invite.token,
+            invite_url=f"{settings.practice_portal_base_url}/set-password/{invite.token}",
             status=get_invite_status(invite),
             created_at=invite.created_at,
             expires_at=invite.expires_at,
