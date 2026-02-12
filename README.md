@@ -84,6 +84,8 @@ Copy `.env.example` to `.env` and configure:
 | UNDERWRITING_AUTO_APPROVE_BELOW_CENTS | Auto-approve threshold | 10000 ($100) |
 | ADMIN_EMAIL | Initial admin email | admin@spoonbill.com |
 | ADMIN_PASSWORD | Initial admin password | changeme123 |
+| INTAKE_BASE_URL | Base URL for invite links (Intake frontend) | http://localhost:5175 |
+| CORS_ALLOWED_ORIGINS | Comma-separated list of allowed CORS origins | (none) |
 
 ## Claim Lifecycle
 
