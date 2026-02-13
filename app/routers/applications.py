@@ -510,7 +510,7 @@ def _approve_application(
     db.commit()
     
     settings = get_settings()
-    invite_url = f"{settings.practice_portal_base_url}/set-password/{invite_token}"
+    invite_url = f"{settings.practice_portal_base_url}/#/set-password/{invite_token}"
     
     return ApplicationApprovalResult(
         application_id=application.id,

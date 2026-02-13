@@ -205,7 +205,7 @@ POST /internal/applications/{id}/review
 
 **Environment-driven CORS**: `CORS_ALLOWED_ORIGINS` controls which frontend domains can access the API. Localhost origins are included automatically for local development.
 
-**Invite tokens**: Single-use, time-limited (7 days), 64-character random strings. URLs are generated server-side from `PRACTICE_PORTAL_BASE_URL` -- no client-side URL construction.
+**Invite tokens**: Single-use, time-limited (7 days), 64-character random strings. URLs are generated server-side from `PRACTICE_PORTAL_BASE_URL` -- no client-side URL construction. The Practice Portal uses HashRouter (`/#/set-password/:token`) so invite links work on any static hosting without server-side rewrite rules.
 
 **Document storage**: Files stored on disk with a Docker volume (`/data/uploads`). Download endpoints enforce practice scoping.
 
@@ -320,6 +320,22 @@ curl https://spoonbill-staging-api.onrender.com/health
 
 # API docs: https://spoonbill-staging-api.onrender.com/docs
 ```
+
+### SPA Routing
+
+The Practice Portal uses **HashRouter** (`/#/...` URLs) so client-side routes work on any static host without server-side rewrite configuration. Invite links use the format: `{PRACTICE_PORTAL_BASE_URL}/#/set-password/{token}`.
+
+The Internal Console and Intake Portal have `/*` --> `/index.html` rewrite rules in `render.yaml`, but these only take effect if services are deployed via Render Blueprints. For manually created services, add the rewrite rule in the Render Dashboard under Static Site settings.
+
+### How to Reissue an Invite
+
+If a practice manager's invite link has expired or was lost:
+
+1. Open the Internal Console
+2. Navigate to the **Practices** tab
+3. Select the practice
+4. Click **Reissue Invite** -- this expires any previous active invites and generates a new 7-day token
+5. Copy the new invite link and share it with the practice manager
 
 **Troubleshooting:**
 - **CORS errors**: Ensure `CORS_ALLOWED_ORIGINS` includes exact frontend URLs (no trailing slashes)
