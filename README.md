@@ -135,6 +135,78 @@ NEW → NEEDS_REVIEW → APPROVED → PAID → COLLECTING → CLOSED
 - **CLOSED**: Claim fully resolved
 - **DECLINED**: Claim rejected
 
+## Practice Onboarding Flow
+
+New practices go through a multi-step onboarding process before they can access the Practice Portal:
+
+### 1. Application Submission
+
+A practice submits an application via the public Intake form (no authentication required):
+
+```bash
+curl -X POST http://localhost:8000/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "legal_name": "Sunrise Family Dentistry",
+    "address": "123 Main St, Austin, TX 78701",
+    "phone": "512-555-1234",
+    "practice_type": "GENERAL_DENTISTRY",
+    "years_in_operation": 5,
+    "provider_count": 3,
+    "operatory_count": 6,
+    "avg_monthly_collections_range": "$50,000 - $100,000",
+    "insurance_vs_self_pay_mix": "70% insurance, 30% self-pay",
+    "billing_model": "IN_HOUSE",
+    "contact_name": "Sarah Johnson",
+    "contact_email": "sarah@sunrisedental.com"
+  }'
+```
+
+### 2. Ops Review
+
+Spoonbill Ops reviews the application in the Internal Console (Applications tab). They can:
+- View application details
+- Approve or decline the application
+- Request additional information
+
+### 3. Approval and Invite Generation
+
+When an application is approved:
+1. A new Practice is created in the system
+2. A Practice Manager user is created (inactive, no password)
+3. An invite token is generated (valid for 7 days)
+4. The invite URL is displayed in the Internal Console
+
+The invite URL format is: `{PRACTICE_PORTAL_BASE_URL}/set-password/{token}`
+
+### 4. Password Setup
+
+The practice manager receives the invite link and:
+1. Opens the link in their browser
+2. The Practice Portal validates the token via `GET /public/invites/{token}`
+3. If valid, shows the practice name, email, and password form
+4. Manager sets their password via `POST /public/invites/{token}/set-password`
+5. On success, redirected to login
+
+### 5. Login to Practice Portal
+
+The practice manager can now log in to the Practice Portal with their email and password.
+
+### Invite Management
+
+From the Internal Console (Practices tab), Ops can:
+- View all practices and their invite status
+- Copy active invite links
+- Reissue expired invites (generates new token, expires old ones)
+
+### Invite Token Security
+
+- Tokens are cryptographically random (URL-safe base64)
+- Tokens expire after 7 days
+- Tokens are single-use (marked as used after password is set)
+- All invalid token attempts return generic 404 (no information leakage)
+- `PRACTICE_INVITE_USED` audit event is logged when password is set
+
 ## API Endpoints
 
 ### Authentication

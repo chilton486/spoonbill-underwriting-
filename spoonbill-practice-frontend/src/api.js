@@ -171,7 +171,7 @@ export const getPaymentStatus = async (claimId) => {
 };
 
 export const validateInviteToken = async (token) => {
-  const response = await fetch(`${API_BASE_URL}/invite/${token}`);
+  const response = await fetch(`${API_BASE_URL}/public/invites/${token}`);
 
   if (!response.ok) {
     const error = await response.json();
@@ -182,10 +182,10 @@ export const validateInviteToken = async (token) => {
 };
 
 export const setPassword = async (token, password) => {
-  const response = await fetch(`${API_BASE_URL}/set-password`, {
+  const response = await fetch(`${API_BASE_URL}/public/invites/${token}/set-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, password }),
+    body: JSON.stringify({ password }),
   });
 
   if (!response.ok) {
