@@ -311,8 +311,8 @@ class TestInviteUrlGeneration:
         from app.config import Settings
         s = Settings(database_url="postgresql://x:x@localhost/x")
         token = "abc123"
-        invite_url = f"{s.practice_portal_base_url}/set-password/{token}"
-        assert invite_url == "https://portal.example.com/set-password/abc123"
+        invite_url = f"{s.practice_portal_base_url}/#/set-password/{token}"
+        assert invite_url == "https://portal.example.com/#/set-password/abc123"
         assert "localhost" not in invite_url
         if old is not None:
             os.environ['PRACTICE_PORTAL_BASE_URL'] = old
@@ -326,8 +326,8 @@ class TestInviteUrlGeneration:
             practice_portal_base_url="https://portal.example.com",
         )
         token = "test-token"
-        invite_url = f"{s.practice_portal_base_url}/set-password/{token}"
-        assert "//" not in invite_url.replace("https://", "")
+        invite_url = f"{s.practice_portal_base_url}/#/set-password/{token}"
+        assert invite_url == "https://portal.example.com/#/set-password/test-token"
 
     def test_approval_result_schema_has_invite_url(self):
         from app.schemas.practice_application import ApplicationApprovalResult

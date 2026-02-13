@@ -9,7 +9,9 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 
-import { validateInviteToken, setPassword } from '../api';
+import { validateInviteToken, setPassword, API_BASE_URL } from '../api';
+
+const isDev = import.meta.env.DEV;
 
 export default function SetPasswordPage() {
   const { token } = useParams();
@@ -128,6 +130,11 @@ export default function SetPasswordPage() {
   return (
     <Container maxWidth="sm">
       <Box sx={{ mt: 8 }}>
+        {isDev && (
+          <Alert severity="info" sx={{ mb: 2, fontSize: '0.75rem' }}>
+            API: {API_BASE_URL}
+          </Alert>
+        )}
         <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 600 }}>
           Spoonbill Practice Portal
         </Typography>

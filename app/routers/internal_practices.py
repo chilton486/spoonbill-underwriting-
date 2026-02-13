@@ -235,7 +235,7 @@ def get_practice(
             user_id=invite.user_id,
             user_email=user.email if user else "unknown",
             token=invite.token,
-            invite_url=f"{settings.practice_portal_base_url}/set-password/{invite.token}",
+            invite_url=f"{settings.practice_portal_base_url}/#/set-password/{invite.token}",
             status=get_invite_status(invite),
             created_at=invite.created_at,
             expires_at=invite.expires_at,
@@ -294,7 +294,7 @@ def list_practice_invites(
             user_id=invite.user_id,
             user_email=user.email if user else "unknown",
             token=invite.token,
-            invite_url=f"{settings.practice_portal_base_url}/set-password/{invite.token}",
+            invite_url=f"{settings.practice_portal_base_url}/#/set-password/{invite.token}",
             status=get_invite_status(invite),
             created_at=invite.created_at,
             expires_at=invite.expires_at,
@@ -389,7 +389,7 @@ def reissue_invite(
     
     # Build full invite URL using configured base URL
     settings = get_settings()
-    invite_url = f"{settings.practice_portal_base_url}/set-password/{new_token}"
+    invite_url = f"{settings.practice_portal_base_url}/#/set-password/{new_token}"
     
     return ReissueInviteResponse(
         invite_id=new_invite.id,
