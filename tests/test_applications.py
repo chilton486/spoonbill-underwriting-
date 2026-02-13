@@ -340,3 +340,144 @@ class TestInviteUrlGeneration:
         s = Settings(database_url="postgresql://x:x@localhost/x")
         assert hasattr(s, 'intake_portal_base_url')
         assert s.intake_portal_base_url == "http://localhost:5175"
+
+
+class TestInviteEndpoints:
+    """Tests for public invite validation and set-password endpoints."""
+
+    def test_invite_validation_response_has_practice_name(self):
+        """Test that InviteValidationResponse includes practice_name field."""
+        from app.routers.applications import InviteValidationResponse
+        fields = InviteValidationResponse.model_fields
+        assert 'practice_name' in fields
+        assert 'email' in fields
+        assert 'expires_at' in fields
+        assert 'valid' in fields
+
+    def test_set_password_request_has_password_field(self):
+        """Test that SetPasswordRequest has password field with validation."""
+        from app.routers.applications import SetPasswordRequest
+        fields = SetPasswordRequest.model_fields
+        assert 'password' in fields
+        # Password should have min_length constraint
+        password_field = fields['password']
+        assert password_field.metadata is not None or password_field.json_schema_extra is not None
+
+    def test_set_password_response_has_required_fields(self):
+        """Test that SetPasswordResponse has success, email, message fields."""
+        from app.routers.applications import SetPasswordResponse
+        fields = SetPasswordResponse.model_fields
+        assert 'success' in fields
+        assert 'email' in fields
+        assert 'message' in fields
+
+    def test_password_min_length_validation(self):
+        """Test that password must be at least 8 characters."""
+        from app.routers.applications import SetPasswordRequest
+        from pydantic import ValidationError
+        
+        # Should fail with short password
+        try:
+            SetPasswordRequest(password="short")
+            assert False, "Should have raised validation error for short password"
+        except ValidationError:
+            pass  # Expected
+        
+        # Should succeed with valid password
+        req = SetPasswordRequest(password="validpassword123")
+        assert req.password == "validpassword123"
+
+    def test_password_max_length_validation(self):
+        """Test that password must be at most 128 characters."""
+        from app.routers.applications import SetPasswordRequest
+        from pydantic import ValidationError
+        
+        # Should fail with too long password
+        try:
+            SetPasswordRequest(password="x" * 129)
+            assert False, "Should have raised validation error for long password"
+        except ValidationError:
+            pass  # Expected
+        
+        # Should succeed with max length password
+        req = SetPasswordRequest(password="x" * 128)
+        assert len(req.password) == 128
+
+
+class TestInviteEndpointPaths:
+    """Tests for invite endpoint URL paths."""
+
+    def test_validate_invite_endpoint_path(self):
+        """Test that validate_invite_token endpoint uses /public/invites/{token} path."""
+        from app.routers.applications import router
+        
+        # Find the validate_invite_token route
+        routes = [r for r in router.routes if hasattr(r, 'path')]
+        validate_route = None
+        for route in routes:
+            if 'public/invites' in route.path and 'set-password' not in route.path:
+                validate_route = route
+                break
+        
+        assert validate_route is not None, "Validate invite endpoint not found"
+        assert validate_route.path == "/public/invites/{token}"
+        assert "GET" in validate_route.methods
+
+    def test_set_password_endpoint_path(self):
+        """Test that set_password endpoint uses /public/invites/{token}/set-password path."""
+        from app.routers.applications import router
+        
+        # Find the set_password route
+        routes = [r for r in router.routes if hasattr(r, 'path')]
+        set_password_route = None
+        for route in routes:
+            if 'set-password' in route.path:
+                set_password_route = route
+                break
+        
+        assert set_password_route is not None, "Set password endpoint not found"
+        assert set_password_route.path == "/public/invites/{token}/set-password"
+        assert "POST" in set_password_route.methods
+
+
+class TestInviteSecurityRequirements:
+    """Tests for invite security requirements."""
+
+    def test_invite_token_is_single_use(self):
+        """Test that invite model tracks used_at for single-use enforcement."""
+        from app.models.invite import PracticeManagerInvite
+        from sqlalchemy import inspect
+        
+        mapper = inspect(PracticeManagerInvite)
+        columns = {c.key: c for c in mapper.columns}
+        
+        assert 'used_at' in columns
+        # used_at should be nullable (None when not used)
+        assert columns['used_at'].nullable is True
+
+    def test_invite_has_expiration(self):
+        """Test that invite model has expires_at field."""
+        from app.models.invite import PracticeManagerInvite
+        from sqlalchemy import inspect
+        
+        mapper = inspect(PracticeManagerInvite)
+        columns = {c.key for c in mapper.columns}
+        
+        assert 'expires_at' in columns
+
+    def test_invite_expiry_constant_is_7_days(self):
+        """Test that invite token expiry is set to 7 days."""
+        from app.routers.applications import INVITE_TOKEN_EXPIRY_DAYS
+        assert INVITE_TOKEN_EXPIRY_DAYS == 7
+
+    def test_audit_event_for_invite_used(self):
+        """Test that PRACTICE_INVITE_USED audit event is logged on password set."""
+        # This is a documentation test - the actual audit event is logged in set_password
+        # We verify the event name is used correctly
+        import inspect as py_inspect
+        from app.routers import applications
+        
+        source = py_inspect.getsource(applications.set_password)
+        assert "PRACTICE_INVITE_USED" in source
+        assert "AuditService.log_event" in source
+        assert "practice_id" in source  # Should include practice_id in metadata

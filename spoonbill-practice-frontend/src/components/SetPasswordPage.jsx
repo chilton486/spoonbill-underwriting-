@@ -17,6 +17,7 @@ export default function SetPasswordPage() {
 
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
+  const [practiceName, setPracticeName] = useState('');
   const [error, setError] = useState(null);
   const [tokenValid, setTokenValid] = useState(false);
 
@@ -31,6 +32,7 @@ export default function SetPasswordPage() {
       try {
         const data = await validateInviteToken(token);
         setEmail(data.email);
+        setPracticeName(data.practice_name);
         setTokenValid(true);
       } catch (err) {
         setError(err.message);
@@ -133,8 +135,11 @@ export default function SetPasswordPage() {
           <Typography variant="h6" gutterBottom>
             Set Your Password
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Welcome to <strong>{practiceName}</strong>!
+          </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Welcome! Set a password for <strong>{email}</strong> to access the Practice Portal.
+            Set a password for <strong>{email}</strong> to access the Practice Portal.
           </Typography>
 
           {formError && (
