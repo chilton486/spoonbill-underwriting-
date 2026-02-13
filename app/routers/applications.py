@@ -563,9 +563,16 @@ def get_application_stats(
 # INVITE / SET PASSWORD ENDPOINTS (Public)
 # =============================================================================
 
+class InviteValidationResponse(BaseModel):
+    """Response schema for invite token validation."""
+    valid: bool
+    email: str
+    practice_name: str
+    expires_at: str
+
+
 class SetPasswordRequest(BaseModel):
     """Request schema for setting password via invite token."""
-    token: str = Field(..., min_length=1)
     password: str = Field(..., min_length=8, max_length=128)
 
 
@@ -576,16 +583,28 @@ class SetPasswordResponse(BaseModel):
     message: str
 
 
-@router.get("/invite/{token}")
+@router.get("/public/invites/{token}", response_model=InviteValidationResponse)
 def validate_invite_token(
     token: str,
     db: Session = Depends(get_db),
 ):
     """
-    Validate an invite token and return basic info.
+    Validate an invite token and return invite metadata.
     
     This is a PUBLIC endpoint - no authentication required.
     Used by the set-password page to verify the token before showing the form.
+    
+    Returns:
+        - practice_name: Name of the practice the user is being invited to
+        - email: Email address of the invited user
+        - expires_at: ISO timestamp when the invite expires
+    
+    Errors:
+        - 404: Invalid token (token not found)
+        - 404: Expired token
+        - 404: Already used token
+    
+    Security: Returns generic 404 for all invalid cases to avoid leaking info.
     """
     invite = db.query(PracticeManagerInvite).filter(
         PracticeManagerInvite.token == token
@@ -599,32 +618,38 @@ def validate_invite_token(
     
     if invite.used_at is not None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This invite link has already been used. Please contact support if you need assistance.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or expired invite link.",
         )
     
     if datetime.utcnow() > invite.expires_at:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This invite link has expired. Please contact support to request a new invite.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or expired invite link.",
         )
     
     user = db.query(User).filter(User.id == invite.user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User account not found.",
+            detail="Invalid or expired invite link.",
         )
     
-    return {
-        "valid": True,
-        "email": user.email,
-        "expires_at": invite.expires_at.isoformat(),
-    }
+    # Get practice name for display
+    practice = db.query(Practice).filter(Practice.id == user.practice_id).first()
+    practice_name = practice.name if practice else "Unknown Practice"
+    
+    return InviteValidationResponse(
+        valid=True,
+        email=user.email,
+        practice_name=practice_name,
+        expires_at=invite.expires_at.isoformat(),
+    )
 
 
-@router.post("/set-password", response_model=SetPasswordResponse)
+@router.post("/public/invites/{token}/set-password", response_model=SetPasswordResponse)
 def set_password(
+    token: str,
     request_data: SetPasswordRequest,
     db: Session = Depends(get_db),
 ):
@@ -633,9 +658,20 @@ def set_password(
     
     This is a PUBLIC endpoint - no authentication required.
     The token is single-use and expires after 7 days.
+    
+    Security requirements:
+        - Token must be valid (exists in database)
+        - Token must not be expired
+        - Token must not have been used before (single-use)
+    
+    On success:
+        - Sets the user's password (hashed)
+        - Activates the user account
+        - Marks the invite as used with timestamp
+        - Emits PRACTICE_INVITE_USED audit event
     """
     invite = db.query(PracticeManagerInvite).filter(
-        PracticeManagerInvite.token == request_data.token
+        PracticeManagerInvite.token == token
     ).first()
     
     if not invite:
@@ -654,8 +690,8 @@ def set_password(
             extra={"invite_id": invite.id, "rejection_reason": "TOKEN_ALREADY_USED"}
         )
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This invite link has already been used.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or expired invite link.",
         )
     
     if datetime.utcnow() > invite.expires_at:
@@ -664,15 +700,15 @@ def set_password(
             extra={"invite_id": invite.id, "rejection_reason": "TOKEN_EXPIRED"}
         )
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This invite link has expired. Please contact support to request a new invite.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or expired invite link.",
         )
     
     user = db.query(User).filter(User.id == invite.user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User account not found.",
+            detail="Invalid or expired invite link.",
         )
     
     # Update user's password and activate account
@@ -682,16 +718,17 @@ def set_password(
     # Mark invite as used
     invite.used_at = datetime.utcnow()
     
-    # Log audit event
+    # Log audit event with practice_id for tenant tracking
     AuditService.log_event(
         db,
         claim_id=None,
-        action="PASSWORD_SET_VIA_INVITE",
+        action="PRACTICE_INVITE_USED",
         actor_user_id=user.id,
         metadata={
             "user_id": user.id,
             "email": user.email,
             "invite_id": invite.id,
+            "practice_id": user.practice_id,
         },
     )
     
@@ -699,7 +736,7 @@ def set_password(
     
     logger.info(
         "Password set successfully via invite",
-        extra={"user_id": user.id, "email": user.email}
+        extra={"user_id": user.id, "email": user.email, "practice_id": user.practice_id}
     )
     
     return SetPasswordResponse(
