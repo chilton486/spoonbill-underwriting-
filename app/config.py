@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     sendgrid_api_key: str = ""
     email_from_address: str = "noreply@spoonbill.com"
     email_internal_alerts: str = ""
+
+    # LLM (OpenAI) for ontology briefs
+    openai_api_key: str = ""
     
     class Config:
         env_file = ".env"

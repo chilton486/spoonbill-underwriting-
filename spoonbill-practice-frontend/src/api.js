@@ -223,6 +223,45 @@ export const listPayments = async () => {
   return response.json();
 };
 
+export const getOntologyContext = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/context`, {
+    headers: headers(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch ontology context');
+  }
+
+  return response.json();
+};
+
+export const generateOntologyBrief = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/brief`, {
+    method: 'POST',
+    headers: headers(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate ontology brief');
+  }
+
+  return response.json();
+};
+
+export const adjustPracticeLimit = async (practiceId, newLimit, reason) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/limit`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ new_limit: newLimit, reason }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to adjust practice limit');
+  }
+
+  return response.json();
+};
+
 export const validateInviteToken = async (token) => {
   const response = await fetch(`${API_BASE_URL}/public/invites/${token}`);
 
