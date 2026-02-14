@@ -13,8 +13,8 @@ from app.models.practice import Practice
 from app.models.claim import Claim, ClaimStatus
 from app.models.payment import PaymentIntent, PaymentIntentStatus, PaymentProvider
 from app.models.user import User, UserRole
-from app.models.ontology import OntologyObject, OntologyObjectType, OntologyLink, OntologyLinkType, KPIObservation
-from app.services.ontology import OntologyBuilder
+from app.models.ontology import OntologyObject, OntologyObjectType, OntologyLink, OntologyLinkType, KPIObservation, MetricTimeseries
+from app.services.ontology_v2 import OntologyBuilderV2
 from app.services.ontology_brief import _template_generate, _validate_brief
 
 
@@ -37,7 +37,7 @@ def db(setup_db):
         yield session
     finally:
         session.rollback()
-        for tbl in (KPIObservation, OntologyLink, OntologyObject):
+        for tbl in (MetricTimeseries, KPIObservation, OntologyLink, OntologyObject):
             session.query(tbl).delete()
         session.commit()
         session.close()
@@ -112,7 +112,7 @@ class TestOntologyContextSchema:
         _create_claim(db, practice.id, amount=30000)
         _create_claim(db, practice.id, amount=20000, status=ClaimStatus.DECLINED.value)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
         totals = context["snapshot"]["totals"]
 
         assert totals["total_claims"] == 3
@@ -123,7 +123,7 @@ class TestOntologyContextSchema:
         _create_claim(db, practice.id, payer="Delta Dental", amount=70000)
         _create_claim(db, practice.id, payer="Cigna", amount=30000)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
         payer_mix = context["snapshot"]["payer_mix"]
 
         assert len(payer_mix) == 2
@@ -135,7 +135,7 @@ class TestOntologyContextSchema:
         _create_claim(db, practice.id, amount=50000, status=ClaimStatus.APPROVED.value)
         _create_claim(db, practice.id, amount=50000, status=ClaimStatus.DECLINED.value)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
         denials = context["snapshot"]["denials"]
 
         assert denials["denial_rate"] == 0.5
@@ -146,7 +146,7 @@ class TestOntologyContextSchema:
         c = _create_claim(db, practice.id, amount=50000, status=ClaimStatus.PAID.value)
         _create_payment(db, c.id, practice.id, 50000)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
         funding = context["snapshot"]["funding"]
 
         assert funding["utilization"] == 0.5
@@ -156,7 +156,7 @@ class TestOntologyContextSchema:
         _create_claim(db, practice.id, payer="Monopoly Dental", amount=90000)
         _create_claim(db, practice.id, payer="Other", amount=10000)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
         flags = context["snapshot"]["risk_flags"]
 
         flag_names = [f["flag"] for f in flags]
@@ -169,7 +169,7 @@ class TestOntologyContextSchema:
         for _ in range(3):
             _create_claim(db, practice.id, status=ClaimStatus.DECLINED.value)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
         flags = context["snapshot"]["risk_flags"]
 
         flag_names = [f["flag"] for f in flags]
@@ -179,7 +179,7 @@ class TestOntologyContextSchema:
         practice = _create_practice(db, limit=None)
         _create_claim(db, practice.id)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
         missing = context["snapshot"]["missing_data"]
 
         assert any("funded_utilization" in m for m in missing)
@@ -190,8 +190,8 @@ class TestOntologyContextSchema:
         _create_claim(db, p1.id, payer="P1 Payer", amount=50000)
         _create_claim(db, p2.id, payer="P2 Payer", amount=30000)
 
-        ctx1 = OntologyBuilder.get_practice_context(db, p1.id)
-        ctx2 = OntologyBuilder.get_practice_context(db, p2.id)
+        ctx1 = OntologyBuilderV2.get_practice_context(db, p1.id)
+        ctx2 = OntologyBuilderV2.get_practice_context(db, p2.id)
 
         assert ctx1["snapshot"]["totals"]["total_claims"] == 1
         assert ctx2["snapshot"]["totals"]["total_claims"] == 1
@@ -205,7 +205,7 @@ class TestOntologyBuilder:
         practice = _create_practice(db)
         _create_claim(db, practice.id, payer="Delta Dental", codes="D0120")
 
-        result = OntologyBuilder.build_practice_ontology(db, practice.id)
+        result = OntologyBuilderV2.build_practice_ontology(db, practice.id)
 
         assert result["objects"] > 0
         assert result["metrics"] > 0
@@ -223,10 +223,10 @@ class TestOntologyBuilder:
         practice = _create_practice(db)
         _create_claim(db, practice.id)
 
-        OntologyBuilder.build_practice_ontology(db, practice.id)
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
         count1 = db.query(OntologyObject).filter(OntologyObject.practice_id == practice.id).count()
 
-        OntologyBuilder.build_practice_ontology(db, practice.id)
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
         count2 = db.query(OntologyObject).filter(OntologyObject.practice_id == practice.id).count()
 
         assert count1 == count2
@@ -285,6 +285,233 @@ class TestBriefSchema:
         assert not _validate_brief("not a dict")
 
 
+class TestPatientOntology:
+
+    def test_build_creates_patient_objects(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta Dental")
+        _create_claim(db, practice.id, payer="Cigna")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+
+        patients = db.query(OntologyObject).filter(
+            OntologyObject.practice_id == practice.id,
+            OntologyObject.object_type == OntologyObjectType.PATIENT.value,
+        ).all()
+        assert len(patients) >= 1
+
+        for p in patients:
+            props = p.properties_json
+            assert "patient_hash" in props
+            assert "age_bucket" in props
+            assert "insurance_type" in props
+            assert "claim_count" in props
+            assert props["claim_count"] >= 1
+
+    def test_patient_links_created(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+
+        links = db.query(OntologyLink).filter(
+            OntologyLink.practice_id == practice.id,
+            OntologyLink.link_type == OntologyLinkType.CLAIM_BELONGS_TO_PATIENT.value,
+        ).all()
+        assert len(links) >= 1
+
+    def test_patient_dynamics_in_context(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta Dental", amount=50000)
+        _create_claim(db, practice.id, payer="Cigna", amount=30000)
+
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
+        pd = context["snapshot"]["patient_dynamics"]
+
+        assert "total_patients" in pd
+        assert pd["total_patients"] >= 1
+        assert "revenue_per_patient_cents" in pd
+        assert "repeat_visit_rate" in pd
+        assert "age_mix" in pd
+        assert "insurance_mix" in pd
+
+
+class TestCFO360:
+
+    def test_cfo_schema(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta Dental", amount=50000)
+        c = _create_claim(db, practice.id, payer="Cigna", amount=30000, status=ClaimStatus.PAID.value)
+        _create_payment(db, c.id, practice.id, 30000)
+
+        cfo = OntologyBuilderV2.get_cfo_360(db, practice.id)
+
+        assert "capital" in cfo
+        assert "revenue" in cfo
+        assert "payer_risk" in cfo
+        assert "patient_dynamics" in cfo
+        assert "operational_risk" in cfo
+        assert "growth" in cfo
+
+    def test_cfo_capital_values(self, db):
+        practice = _create_practice(db, limit=200_000)
+        c = _create_claim(db, practice.id, amount=100_000, status=ClaimStatus.PAID.value)
+        _create_payment(db, c.id, practice.id, 100_000)
+
+        cfo = OntologyBuilderV2.get_cfo_360(db, practice.id)
+        capital = cfo["capital"]
+
+        assert capital["total_funded_cents"] == 100_000
+        assert capital["funding_limit_cents"] == 200_000
+        assert capital["available_capacity_cents"] == 100_000
+        assert capital["utilization"] == 0.5
+
+    def test_cfo_payer_risk(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Monopoly Dental", amount=90000)
+        _create_claim(db, practice.id, payer="Other", amount=10000)
+
+        cfo = OntologyBuilderV2.get_cfo_360(db, practice.id)
+        assert cfo["payer_risk"]["concentration"] == 0.9
+        assert cfo["payer_risk"]["top_payer"] == "Monopoly Dental"
+
+
+class TestRiskEngine:
+
+    def test_payer_concentration_risk(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Monopoly Dental", amount=80000)
+        _create_claim(db, practice.id, payer="Other", amount=20000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        risks = OntologyBuilderV2.get_risks(db, practice.id)
+
+        types = [r["type"] for r in risks]
+        assert "PAYER_CONCENTRATION_RISK" in types
+
+    def test_no_risks_for_healthy_practice(self, db):
+        practice = _create_practice(db, limit=1_000_000_00)
+        _create_claim(db, practice.id, payer="Delta", amount=25000)
+        _create_claim(db, practice.id, payer="Cigna", amount=25000)
+        _create_claim(db, practice.id, payer="MetLife", amount=25000)
+        _create_claim(db, practice.id, payer="Aetna", amount=25000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        risks = OntologyBuilderV2.get_risks(db, practice.id)
+
+        high_risks = [r for r in risks if r["severity"] == "high"]
+        assert len(high_risks) == 0
+
+    def test_risk_has_required_fields(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Monopoly", amount=90000)
+        _create_claim(db, practice.id, payer="Other", amount=10000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        risks = OntologyBuilderV2.get_risks(db, practice.id)
+
+        for r in risks:
+            assert "type" in r
+            assert "severity" in r
+            assert r["severity"] in ("low", "medium", "high")
+            assert "metric" in r
+            assert "value" in r
+            assert "explanation" in r
+
+
+class TestGraphExplorer:
+
+    def test_graph_has_nodes_and_edges(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta Dental", codes="D0120")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id)
+
+        assert "nodes" in graph
+        assert "edges" in graph
+        assert len(graph["nodes"]) >= 3
+        assert len(graph["edges"]) >= 1
+
+    def test_graph_node_types(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta Dental", codes="D0120")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id)
+
+        node_types = {n["type"] for n in graph["nodes"]}
+        assert "Practice" in node_types
+        assert "Payer" in node_types
+
+    def test_graph_node_has_properties(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta Dental")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id)
+
+        for node in graph["nodes"]:
+            assert "id" in node
+            assert "type" in node
+            assert "key" in node
+            assert "properties" in node
+
+
+class TestCohortMath:
+
+    def test_cohorts_schema(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, amount=50000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        cohorts = OntologyBuilderV2.get_cohorts(db, practice.id)
+
+        assert "submission_cohorts" in cohorts
+        assert "aging_buckets" in cohorts
+        assert "lag_curve" in cohorts
+        assert "timeseries" in cohorts
+
+    def test_aging_buckets(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, amount=50000, status=ClaimStatus.APPROVED.value)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        cohorts = OntologyBuilderV2.get_cohorts(db, practice.id)
+        aging = cohorts["aging_buckets"]
+
+        assert "0_30" in aging
+        assert "30_60" in aging
+        assert "60_90" in aging
+        assert "90_plus" in aging
+        total = aging["0_30"] + aging["30_60"] + aging["60_90"] + aging["90_plus"]
+        assert total >= 1
+
+    def test_submission_cohorts(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, amount=50000)
+        _create_claim(db, practice.id, amount=30000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        cohorts = OntologyBuilderV2.get_cohorts(db, practice.id)
+
+        assert len(cohorts["submission_cohorts"]) >= 1
+        for sc in cohorts["submission_cohorts"]:
+            assert "month" in sc
+            assert "claims" in sc
+            assert "billed_cents" in sc
+
+    def test_timeseries_populated(self, db):
+        practice = _create_practice(db)
+        c = _create_claim(db, practice.id, amount=50000, status=ClaimStatus.PAID.value)
+        _create_payment(db, c.id, practice.id, 50000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        cohorts = OntologyBuilderV2.get_cohorts(db, practice.id)
+
+        assert isinstance(cohorts["timeseries"], dict)
+
+
 class TestIntegration:
 
     def test_seeded_practice_returns_valid_context(self, db):
@@ -292,11 +519,12 @@ class TestIntegration:
         if not practice:
             pytest.skip("No practice in database")
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
 
-        assert context["version"] == "ontology-v1"
+        assert context["version"] == "ontology-v2"
         assert context["practice"]["id"] == practice.id
         assert context["snapshot"]["totals"]["total_claims"] >= 0
         assert isinstance(context["snapshot"]["payer_mix"], list)
         assert isinstance(context["snapshot"]["risk_flags"], list)
         assert isinstance(context["snapshot"]["missing_data"], list)
+        assert "patient_dynamics" in context["snapshot"]

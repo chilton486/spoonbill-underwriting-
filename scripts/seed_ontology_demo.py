@@ -20,8 +20,13 @@ from app.models.claim import Claim, ClaimStatus
 from app.models.payment import PaymentIntent, PaymentIntentStatus, PaymentProvider
 from app.services.auth import AuthService
 
-PAYERS = ["Delta Dental", "Cigna Dental", "MetLife", "Aetna Dental", "Guardian"]
-CDT_CODES = ["D0120", "D0274", "D1110", "D2150", "D2740", "D4341", "D7210", "D0330"]
+PAYERS = ["Delta Dental", "Cigna Dental", "MetLife", "Aetna Dental", "Guardian", "Medicaid State", "Self Pay"]
+CDT_CODES = ["D0120", "D0274", "D1110", "D2150", "D2740", "D4341", "D7210", "D0330", "D2391", "D4910"]
+PATIENT_NAMES = [
+    "Alice Johnson", "Bob Smith", "Carol Davis", "David Wilson", "Eva Martinez",
+    "Frank Brown", "Grace Lee", "Henry Taylor", "Irene Anderson", "Jack Thomas",
+    "Karen White", "Leo Harris", "Maria Clark", "Nathan Lewis", "Olivia Walker",
+]
 STATUSES_WITH_WEIGHTS = [
     (ClaimStatus.APPROVED.value, 8),
     (ClaimStatus.PAID.value, 5),
@@ -79,16 +84,17 @@ def main():
         random.seed(42)
         now = datetime.utcnow()
 
-        for i in range(25):
+        for i in range(40):
             payer = random.choice(PAYERS)
             codes = ",".join(random.sample(CDT_CODES, random.randint(1, 3)))
             amount = random.randint(5000, 250000)
             status = weighted_choice(STATUSES_WITH_WEIGHTS)
-            created = now - timedelta(days=random.randint(1, 90), hours=random.randint(0, 23))
+            created = now - timedelta(days=random.randint(1, 120), hours=random.randint(0, 23))
+            patient_name = random.choice(PATIENT_NAMES)
 
             claim = Claim(
                 practice_id=practice.id,
-                patient_name=f"Patient {i+1}",
+                patient_name=patient_name,
                 payer=payer,
                 amount_cents=amount,
                 procedure_date=(created - timedelta(days=random.randint(1, 7))).date(),
@@ -141,7 +147,7 @@ def main():
                 db.add(pi)
 
         db.commit()
-        print(f"Seeded 25 claims with payments for practice {practice.id}")
+        print(f"Seeded 40 claims with payments for practice {practice.id}")
         print(f"Login: ontology-demo@spoonbill.com / demo123")
 
     except Exception as e:

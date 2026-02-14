@@ -262,6 +262,38 @@ export const adjustPracticeLimit = async (practiceId, newLimit, reason) => {
   return response.json();
 };
 
+export const getOntologyCohorts = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/cohorts`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch cohorts');
+  return response.json();
+};
+
+export const getCfo360 = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/cfo`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch CFO 360');
+  return response.json();
+};
+
+export const getOntologyRisks = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/risks`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch risks');
+  return response.json();
+};
+
+export const getOntologyGraph = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/graph`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch graph');
+  return response.json();
+};
+
 export const validateInviteToken = async (token) => {
   const response = await fetch(`${API_BASE_URL}/public/invites/${token}`);
 
