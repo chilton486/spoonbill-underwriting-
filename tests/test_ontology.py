@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 from decimal import Decimal
 from datetime import datetime, timedelta
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
@@ -34,6 +34,9 @@ def setup_db():
 def db(setup_db):
     session = TestSession()
     try:
+        for table_name in ['practices', 'claims']:
+            session.execute(text(f"SELECT setval(pg_get_serial_sequence('{table_name}', 'id'), COALESCE((SELECT MAX(id) FROM {table_name}), 0) + 1, false)"))
+        session.commit()
         yield session
     finally:
         session.rollback()
@@ -90,9 +93,9 @@ class TestOntologyContextSchema:
         _create_claim(db, practice.id, payer="Delta Dental", amount=50000)
         _create_claim(db, practice.id, payer="Cigna", amount=30000)
 
-        context = OntologyBuilder.get_practice_context(db, practice.id)
+        context = OntologyBuilderV2.get_practice_context(db, practice.id)
 
-        assert context["version"] == "ontology-v1"
+        assert context["version"] == "ontology-v2"
         assert "practice" in context
         assert "snapshot" in context
 
