@@ -8,6 +8,7 @@ from .payment import PaymentIntent, PaymentIntentStatus, PaymentProvider, PAYMEN
 from .ledger import LedgerAccount, LedgerAccountType, LedgerEntry, LedgerEntryDirection, LedgerEntryStatus, LedgerEntryRelatedType
 from .practice_application import PracticeApplication, ApplicationStatus, PracticeType, BillingModel, UrgencyLevel
 from .invite import PracticeManagerInvite
+from .ontology import OntologyObject, OntologyObjectType, OntologyLink, OntologyLinkType, KPIObservation
 
 __all__ = [
     "User",

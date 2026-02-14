@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, BigInteger
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -18,6 +18,7 @@ class Practice(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False, default=PracticeStatus.ACTIVE.value)
+    funding_limit_cents = Column(BigInteger, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     users = relationship("User", back_populates="practice")

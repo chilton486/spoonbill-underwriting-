@@ -15,6 +15,7 @@ import ClaimDetail from './components/ClaimDetail';
 import SubmitClaimDialog from './components/SubmitClaimDialog';
 import SetPasswordPage from './components/SetPasswordPage';
 import PaymentsList from './components/PaymentsList';
+import OntologyTab from './components/OntologyTab';
 import { getCurrentUser, getAuthToken, logout, listClaims, getDashboard } from './api';
 
 const STATUS_ORDER = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED', 'PAYMENT_EXCEPTION'];
@@ -302,6 +303,7 @@ function Dashboard() {
             <Tab label="Dashboard" />
             <Tab label="Claims" />
             <Tab label="Payments" />
+            <Tab label="Ontology" />
           </Tabs>
         </Box>
 
@@ -324,6 +326,10 @@ function Dashboard() {
 
         {activeTab === 2 && (
           <PaymentsList />
+        )}
+
+        {activeTab === 3 && user && (
+          <OntologyTab practiceId={user.practice_id} />
         )}
 
         {selectedClaim && (

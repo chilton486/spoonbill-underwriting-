@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router, internal_practices_router
+from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router, internal_practices_router, ontology_router
 from .database import get_db
 from .config import get_settings
 
@@ -30,6 +30,7 @@ app.include_router(practice_router)
 app.include_router(payments_router)
 app.include_router(applications_router)
 app.include_router(internal_practices_router)
+app.include_router(ontology_router)
 
 
 @app.get("/")
