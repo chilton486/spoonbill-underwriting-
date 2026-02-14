@@ -213,10 +213,16 @@ function ClaimDetail({ claimId, open, onClose }) {
   }
 
   if (error) {
+    const isSessionError = error.includes('Session expired');
     return (
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
         <DialogContent>
-          <Alert severity="error">{error}</Alert>
+          <Alert severity={isSessionError ? 'warning' : 'error'} sx={{ mb: 2 }}>{error}</Alert>
+          {!isSessionError && (
+            <Button variant="outlined" size="small" onClick={() => { setError(null); setLoading(true); fetchData(); }}>
+              Try Again
+            </Button>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Close</Button>

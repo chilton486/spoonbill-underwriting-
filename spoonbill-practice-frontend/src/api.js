@@ -1,4 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const IS_DEV = import.meta.env.DEV;
 
 let authToken = localStorage.getItem('practice_token');
 
@@ -87,15 +88,24 @@ export const listClaims = async (filters = {}) => {
 };
 
 export const getClaim = async (claimId) => {
-  const response = await fetch(`${API_BASE_URL}/practice/claims/${claimId}`, {
-    headers: headers(),
-  });
+  const url = `${API_BASE_URL}/practice/claims/${claimId}`;
+  let response;
+  try {
+    response = await fetch(url, { headers: headers() });
+  } catch (err) {
+    if (IS_DEV) console.error('[getClaim] Network error:', url, err);
+    throw new Error('Network error — check your connection and try again.');
+  }
 
   if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error('Claim not found');
+    if (IS_DEV) {
+      const body = await response.text().catch(() => '');
+      console.error(`[getClaim] ${response.status} ${url}`, body);
     }
-    throw new Error('Failed to fetch claim');
+    if (response.status === 401) throw new Error('Session expired — please log in again.');
+    if (response.status === 404) throw new Error('You don\'t have access to this claim.');
+    if (response.status >= 500) throw new Error('Server error — try again later.');
+    throw new Error('Failed to load claim details.');
   }
 
   return response.json();
@@ -140,12 +150,24 @@ export const uploadDocument = async (claimId, file) => {
 };
 
 export const listDocuments = async (claimId) => {
-  const response = await fetch(`${API_BASE_URL}/practice/claims/${claimId}/documents`, {
-    headers: headers(),
-  });
+  const url = `${API_BASE_URL}/practice/claims/${claimId}/documents`;
+  let response;
+  try {
+    response = await fetch(url, { headers: headers() });
+  } catch (err) {
+    if (IS_DEV) console.error('[listDocuments] Network error:', url, err);
+    throw new Error('Network error — check your connection and try again.');
+  }
 
   if (!response.ok) {
-    throw new Error('Failed to fetch documents');
+    if (IS_DEV) {
+      const body = await response.text().catch(() => '');
+      console.error(`[listDocuments] ${response.status} ${url}`, body);
+    }
+    if (response.status === 401) throw new Error('Session expired — please log in again.');
+    if (response.status === 404) throw new Error('You don\'t have access to this claim.');
+    if (response.status >= 500) throw new Error('Server error — try again later.');
+    throw new Error('Failed to load documents.');
   }
 
   return response.json();
@@ -156,15 +178,22 @@ export const getDocumentDownloadUrl = (documentId) => {
 };
 
 export const getPaymentStatus = async (claimId) => {
-  const response = await fetch(`${API_BASE_URL}/practice/claims/${claimId}/payment`, {
-    headers: headers(),
-  });
+  const url = `${API_BASE_URL}/practice/claims/${claimId}/payment`;
+  let response;
+  try {
+    response = await fetch(url, { headers: headers() });
+  } catch (err) {
+    if (IS_DEV) console.error('[getPaymentStatus] Network error:', url, err);
+    return null;
+  }
 
   if (!response.ok) {
-    if (response.status === 404) {
-      return null;
+    if (response.status === 404) return null;
+    if (IS_DEV) {
+      const body = await response.text().catch(() => '');
+      console.error(`[getPaymentStatus] ${response.status} ${url}`, body);
     }
-    throw new Error('Failed to fetch payment status');
+    return null;
   }
 
   return response.json();

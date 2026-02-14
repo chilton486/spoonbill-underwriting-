@@ -194,10 +194,7 @@ def get_practice_claim(
     current_user: User = Depends(require_practice_manager),
 ):
     practice_id = current_user.practice_id
-    
     claim = get_claim_for_practice(db, claim_id, practice_id)
-    verify_claim_ownership(db, claim_id, practice_id)
-    
     return claim
 
 
@@ -209,9 +206,7 @@ async def upload_document(
     current_user: User = Depends(require_practice_manager),
 ):
     practice_id = current_user.practice_id
-    
     get_claim_for_practice(db, claim_id, practice_id)
-    verify_claim_ownership(db, claim_id, practice_id)
     
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     
@@ -259,9 +254,7 @@ def list_claim_documents(
     current_user: User = Depends(require_practice_manager),
 ):
     practice_id = current_user.practice_id
-    
     get_claim_for_practice(db, claim_id, practice_id)
-    verify_claim_ownership(db, claim_id, practice_id)
     
     documents = db.query(ClaimDocument).filter(
         ClaimDocument.claim_id == claim_id,
@@ -308,18 +301,16 @@ def get_claim_payment_status(
     current_user: User = Depends(require_practice_manager),
 ):
     practice_id = current_user.practice_id
-    
     get_claim_for_practice(db, claim_id, practice_id)
-    verify_claim_ownership(db, claim_id, practice_id)
-    
+
     payment = db.query(PaymentIntent).filter(
         PaymentIntent.claim_id == claim_id,
         PaymentIntent.practice_id == practice_id
     ).first()
-    
+
     if not payment:
-        return None
-    
+        raise HTTPException(status_code=404, detail="No payment found for this claim")
+
     return {
         "id": str(payment.id),
         "status": payment.status,
