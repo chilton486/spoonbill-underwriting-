@@ -26,7 +26,94 @@ const statusColors = {
   COLLECTING: 'info',
   CLOSED: 'default',
   DECLINED: 'error',
+  PAYMENT_EXCEPTION: 'error',
 };
+
+const LIFECYCLE_STEPS = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED'];
+
+const stepColors = {
+  completed: '#059669',
+  current: '#2563eb',
+  upcoming: '#d1d5db',
+  exception: '#dc2626',
+};
+
+const whatHappensNext = {
+  NEW: 'Your claim has been submitted and is being reviewed by our underwriting system.',
+  NEEDS_REVIEW: 'Your claim requires additional review. You may be asked to provide supporting documents.',
+  APPROVED: 'Your claim has been approved. Payment is being processed and will be sent shortly.',
+  PAID: 'Payment has been sent. Spoonbill is now collecting from the payer on your behalf.',
+  COLLECTING: 'Collection is in progress. Your claim will be closed once the payer has settled.',
+  CLOSED: 'This claim is complete. No further action is needed.',
+  DECLINED: 'This claim was declined. Contact your Spoonbill representative if you have questions.',
+  PAYMENT_EXCEPTION: 'Funding delayed \u2014 Spoonbill is reviewing. No action needed from you at this time.',
+};
+
+function LifecycleTimeline({ status }) {
+  const currentIdx = LIFECYCLE_STEPS.indexOf(status);
+  const isException = status === 'PAYMENT_EXCEPTION';
+  const isDeclined = status === 'DECLINED';
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0, mb: 2, overflowX: 'auto' }}>
+      {LIFECYCLE_STEPS.map((step, idx) => {
+        let color = stepColors.upcoming;
+        let fontWeight = 400;
+        if (isException && step === 'APPROVED') {
+          color = stepColors.exception;
+          fontWeight = 700;
+        } else if (isDeclined) {
+          color = stepColors.upcoming;
+        } else if (idx < currentIdx) {
+          color = stepColors.completed;
+        } else if (idx === currentIdx) {
+          color = stepColors.current;
+          fontWeight = 700;
+        }
+
+        return (
+          <Box key={step} sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ textAlign: 'center', minWidth: 70 }}>
+              <Box
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  bgcolor: color,
+                  mx: 'auto',
+                  mb: 0.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {idx < currentIdx && !isDeclined && (
+                  <Typography sx={{ color: '#fff', fontSize: '0.7rem', fontWeight: 700 }}>&#10003;</Typography>
+                )}
+              </Box>
+              <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight, color: color === stepColors.upcoming ? '#9ca3af' : color }}>
+                {step.replace('_', ' ')}
+              </Typography>
+            </Box>
+            {idx < LIFECYCLE_STEPS.length - 1 && (
+              <Box sx={{ width: 24, height: 2, bgcolor: idx < currentIdx && !isDeclined ? stepColors.completed : stepColors.upcoming, mx: 0.5 }} />
+            )}
+          </Box>
+        );
+      })}
+      {isException && (
+        <Box sx={{ ml: 2, display: 'flex', alignItems: 'center' }}>
+          <Chip label="PAYMENT EXCEPTION" size="small" sx={{ bgcolor: '#fee2e2', color: '#991b1b', fontWeight: 600 }} />
+        </Box>
+      )}
+      {isDeclined && (
+        <Box sx={{ ml: 2, display: 'flex', alignItems: 'center' }}>
+          <Chip label="DECLINED" size="small" sx={{ bgcolor: '#fee2e2', color: '#991b1b', fontWeight: 600 }} />
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 function ClaimDetail({ claimId, open, onClose }) {
   const [claim, setClaim] = useState(null);
@@ -149,12 +236,22 @@ function ClaimDetail({ claimId, open, onClose }) {
             </Typography>
           </Box>
           <Chip
-            label={claim.status}
+            label={claim.status === 'PAYMENT_EXCEPTION' ? 'Funding Delayed' : claim.status}
             color={statusColors[claim.status] || 'default'}
           />
         </Box>
       </DialogTitle>
       <DialogContent dividers>
+        <LifecycleTimeline status={claim.status} />
+
+        <Alert
+          severity={claim.status === 'DECLINED' || claim.status === 'PAYMENT_EXCEPTION' ? 'warning' : 'info'}
+          sx={{ mb: 3 }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>What happens next?</Typography>
+          <Typography variant="body2">{whatHappensNext[claim.status] || 'Your claim is being processed.'}</Typography>
+        </Alert>
+
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
           <Box>
             <Typography variant="caption" color="text.secondary">Claim Token</Typography>
@@ -183,6 +280,10 @@ function ClaimDetail({ claimId, open, onClose }) {
           <Box>
             <Typography variant="caption" color="text.secondary">External Claim ID</Typography>
             <Typography>{claim.external_claim_id || '-'}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">Submitted</Typography>
+            <Typography>{formatDate(claim.created_at)}</Typography>
           </Box>
         </Box>
 

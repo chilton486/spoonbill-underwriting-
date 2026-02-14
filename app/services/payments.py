@@ -237,6 +237,8 @@ class PaymentOrchestrationService:
         if claim:
             claim.payment_exception = True
             claim.exception_code = failure_code
+            if claim.status == ClaimStatus.APPROVED.value:
+                claim.status = ClaimStatus.PAYMENT_EXCEPTION.value
         
         AuditService.log_event(
             db=db,

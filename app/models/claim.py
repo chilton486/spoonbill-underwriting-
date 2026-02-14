@@ -17,16 +17,18 @@ class ClaimStatus(str, Enum):
     COLLECTING = "COLLECTING"
     CLOSED = "CLOSED"
     DECLINED = "DECLINED"
+    PAYMENT_EXCEPTION = "PAYMENT_EXCEPTION"
 
 
 CLAIM_STATUS_TRANSITIONS = {
     ClaimStatus.NEW: frozenset({ClaimStatus.NEEDS_REVIEW, ClaimStatus.APPROVED, ClaimStatus.DECLINED}),
     ClaimStatus.NEEDS_REVIEW: frozenset({ClaimStatus.APPROVED, ClaimStatus.DECLINED}),
-    ClaimStatus.APPROVED: frozenset({ClaimStatus.PAID, ClaimStatus.DECLINED}),
+    ClaimStatus.APPROVED: frozenset({ClaimStatus.PAID, ClaimStatus.DECLINED, ClaimStatus.PAYMENT_EXCEPTION}),
     ClaimStatus.PAID: frozenset({ClaimStatus.COLLECTING}),
     ClaimStatus.COLLECTING: frozenset({ClaimStatus.CLOSED}),
     ClaimStatus.CLOSED: frozenset(),
     ClaimStatus.DECLINED: frozenset(),
+    ClaimStatus.PAYMENT_EXCEPTION: frozenset({ClaimStatus.APPROVED, ClaimStatus.DECLINED}),
 }
 
 TERMINAL_STATUSES = frozenset({ClaimStatus.CLOSED, ClaimStatus.DECLINED})

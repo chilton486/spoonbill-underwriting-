@@ -1,6 +1,7 @@
+import logging
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,9 @@ from ..models.user import User, UserRole
 from ..schemas.auth import Token
 from ..schemas.user import UserResponse
 from ..services.auth import AuthService
+from ..services.rate_limiter import RateLimiter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -17,6 +21,8 @@ settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 SPOONBILL_ROLES = {UserRole.SPOONBILL_ADMIN.value, UserRole.SPOONBILL_OPS.value}
+
+auth_rate_limiter = RateLimiter(max_requests=10, window_seconds=300)
 
 
 def get_current_user(
@@ -109,11 +115,23 @@ def get_practice_ids_for_user(current_user: User) -> Optional[List[int]]:
 
 @router.post("/login", response_model=Token)
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining = auth_rate_limiter.is_allowed(client_ip)
+    if not allowed:
+        logger.warning(f"Auth rate limit exceeded: ip={client_ip}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+        )
+    auth_rate_limiter.record_request(client_ip)
+
     user = AuthService.authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        logger.info(f"Failed login attempt: email={form_data.username} ip={client_ip}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -128,6 +146,7 @@ def login(
     if user.practice_id:
         token_data["practice_id"] = user.practice_id
     access_token = AuthService.create_access_token(data=token_data)
+    logger.info(f"Successful login: user_id={user.id} email={user.email} role={user.role}")
     return Token(access_token=access_token)
 
 

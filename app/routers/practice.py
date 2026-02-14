@@ -1,17 +1,18 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import date
 import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from ..config import get_settings
 from ..database import get_db
 from ..models.claim import Claim, ClaimStatus
 from ..models.document import ClaimDocument
-from ..models.payment import PaymentIntent
+from ..models.payment import PaymentIntent, PaymentIntentStatus
 from ..models.user import User
 from ..schemas.claim import PracticeClaimCreate, ClaimResponse, ClaimListResponse
 from ..schemas.document import DocumentUploadResponse, DocumentListResponse
@@ -330,3 +331,102 @@ def get_claim_payment_status(
         "failure_code": payment.failure_code,
         "failure_message": payment.failure_message,
     }
+
+
+class DashboardSummary(BaseModel):
+    status_counts: Dict[str, int]
+    action_required: List[ClaimListResponse]
+    recent_claims: List[ClaimListResponse]
+    total_claims: int
+
+
+@router.get("/dashboard", response_model=DashboardSummary)
+def get_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_practice_manager),
+):
+    practice_id = current_user.practice_id
+
+    counts_query = (
+        db.query(Claim.status, func.count(Claim.id))
+        .filter(Claim.practice_id == practice_id)
+        .group_by(Claim.status)
+        .all()
+    )
+    status_counts = {s.value: 0 for s in ClaimStatus}
+    for row_status, count in counts_query:
+        status_counts[row_status] = count
+    total_claims = sum(status_counts.values())
+
+    action_statuses = [
+        ClaimStatus.NEEDS_REVIEW.value,
+        ClaimStatus.PAYMENT_EXCEPTION.value,
+    ]
+    action_required = (
+        db.query(Claim)
+        .filter(Claim.practice_id == practice_id, Claim.status.in_(action_statuses))
+        .order_by(Claim.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    recent_claims = (
+        db.query(Claim)
+        .filter(Claim.practice_id == practice_id)
+        .order_by(Claim.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return DashboardSummary(
+        status_counts=status_counts,
+        action_required=action_required,
+        recent_claims=recent_claims,
+        total_claims=total_claims,
+    )
+
+
+class PracticePaymentResponse(BaseModel):
+    id: str
+    claim_id: int
+    claim_token: str
+    status: str
+    amount_cents: int
+    currency: str
+    created_at: str
+    confirmed_at: Optional[str]
+    failure_code: Optional[str]
+    failure_message: Optional[str]
+
+
+@router.get("/payments", response_model=List[PracticePaymentResponse])
+def list_practice_payments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_practice_manager),
+):
+    practice_id = current_user.practice_id
+
+    payments = (
+        db.query(PaymentIntent)
+        .filter(PaymentIntent.practice_id == practice_id)
+        .order_by(PaymentIntent.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for p in payments:
+        claim = db.query(Claim).filter(Claim.id == p.claim_id).first()
+        result.append(PracticePaymentResponse(
+            id=str(p.id),
+            claim_id=p.claim_id,
+            claim_token=claim.claim_token if claim else "N/A",
+            status=p.status,
+            amount_cents=p.amount_cents,
+            currency=p.currency,
+            created_at=p.created_at.isoformat(),
+            confirmed_at=p.confirmed_at.isoformat() if p.confirmed_at else None,
+            failure_code=p.failure_code,
+            failure_message=p.failure_message,
+        ))
+
+    return result

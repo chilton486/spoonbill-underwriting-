@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Staging: https://spoonbill-staging-intake.onrender.com
     intake_portal_base_url: str = "http://localhost:5175"
     
+    # Email (SendGrid)
+    sendgrid_api_key: str = ""
+    email_from_address: str = "noreply@spoonbill.com"
+    email_internal_alerts: str = ""
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

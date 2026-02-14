@@ -31,9 +31,10 @@ import ClaimDetailDialog from './components/ClaimDetailDialog.jsx'
 import CreateClaimDialog from './components/CreateClaimDialog.jsx'
 import ApplicationsQueue from './components/ApplicationsQueue.jsx'
 import PracticesList from './components/PracticesList.jsx'
+import PaymentExceptions from './components/PaymentExceptions.jsx'
 
-const STATUSES = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED']
-const MAIN_TABS = ['Claims', 'Applications', 'Practices']
+const STATUSES = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED', 'PAYMENT_EXCEPTION']
+const MAIN_TABS = ['Claims', 'Applications', 'Practices', 'Payment Exceptions']
 
 export default function App() {
   const [user, setUser] = React.useState(null)
@@ -259,6 +260,10 @@ export default function App() {
 
                     {mainTab === 2 && (
                       <PracticesList />
+                    )}
+
+                    {mainTab === 3 && (
+                      <PaymentExceptions />
                     )}
         </Stack>
 

@@ -6,7 +6,9 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { submitClaim } from '../api';
 
 function SubmitClaimDialog({ open, onClose, onSubmitted }) {
@@ -20,6 +22,7 @@ function SubmitClaimDialog({ open, onClose, onSubmitted }) {
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -37,7 +40,7 @@ function SubmitClaimDialog({ open, onClose, onSubmitted }) {
         throw new Error('Amount must be a positive number');
       }
 
-      await submitClaim({
+      const result = await submitClaim({
         patient_name: formData.patient_name || null,
         payer: formData.payer,
         amount_cents: amountCents,
@@ -46,15 +49,7 @@ function SubmitClaimDialog({ open, onClose, onSubmitted }) {
         external_claim_id: formData.external_claim_id || null,
       });
 
-      setFormData({
-        patient_name: '',
-        payer: '',
-        amount_cents: '',
-        procedure_date: '',
-        procedure_codes: '',
-        external_claim_id: '',
-      });
-      onSubmitted();
+      setSubmitted(result);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -64,8 +59,51 @@ function SubmitClaimDialog({ open, onClose, onSubmitted }) {
 
   const handleClose = () => {
     setError(null);
-    onClose();
+    if (submitted) {
+      setSubmitted(null);
+      setFormData({
+        patient_name: '',
+        payer: '',
+        amount_cents: '',
+        procedure_date: '',
+        procedure_codes: '',
+        external_claim_id: '',
+      });
+      onSubmitted();
+    } else {
+      onClose();
+    }
   };
+
+  if (submitted) {
+    return (
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogContent>
+          <Box sx={{ textAlign: 'center', py: 3 }}>
+            <CheckCircleOutlineIcon sx={{ fontSize: 64, color: '#059669', mb: 2 }} />
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+              Claim Submitted
+            </Typography>
+            <Box sx={{ bgcolor: '#f0fdf4', border: '1px solid #86efac', borderRadius: 1, p: 2, mb: 2 }}>
+              <Typography variant="caption" color="text.secondary">Claim Token</Typography>
+              <Typography variant="h6" sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                {submitted.claim_token}
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Status: {submitted.status}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Save your claim token for future reference.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose} variant="contained">Done</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
