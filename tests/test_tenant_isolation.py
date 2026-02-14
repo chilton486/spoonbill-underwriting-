@@ -332,6 +332,81 @@ class TestSpoonbillUserAccess:
         assert response.status_code == 403
 
 
+class TestClaimDetailRetrieval:
+    def test_practice_a_can_read_own_claim_detail(
+        self, client, practice_manager_a, claim_practice_a
+    ):
+        token_a = get_token(client, "manager_a@practice-a.com", "password123")
+        response = client.get(
+            f"/practice/claims/{claim_practice_a.id}",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == claim_practice_a.id
+        assert data["payer"] == "Aetna"
+        assert "underwriting_decisions" in data
+        assert "audit_events" in data
+
+    def test_cross_tenant_claim_detail_returns_404(
+        self, client, practice_manager_a, claim_practice_b
+    ):
+        token_a = get_token(client, "manager_a@practice-a.com", "password123")
+        response = client.get(
+            f"/practice/claims/{claim_practice_b.id}",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Claim not found"
+
+    def test_nonexistent_claim_returns_404(
+        self, client, practice_manager_a
+    ):
+        token_a = get_token(client, "manager_a@practice-a.com", "password123")
+        response = client.get(
+            "/practice/claims/99999",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert response.status_code == 404
+
+    def test_claim_detail_without_auth_returns_401(
+        self, client, claim_practice_a
+    ):
+        response = client.get(f"/practice/claims/{claim_practice_a.id}")
+        assert response.status_code == 401
+
+    def test_claim_documents_cross_tenant_returns_404(
+        self, client, practice_manager_a, claim_practice_b
+    ):
+        token_a = get_token(client, "manager_a@practice-a.com", "password123")
+        response = client.get(
+            f"/practice/claims/{claim_practice_b.id}/documents",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert response.status_code == 404
+
+    def test_claim_payment_cross_tenant_returns_404(
+        self, client, practice_manager_a, claim_practice_b
+    ):
+        token_a = get_token(client, "manager_a@practice-a.com", "password123")
+        response = client.get(
+            f"/practice/claims/{claim_practice_b.id}/payment",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert response.status_code == 404
+
+    def test_claim_payment_no_payment_returns_404(
+        self, client, practice_manager_a, claim_practice_a
+    ):
+        token_a = get_token(client, "manager_a@practice-a.com", "password123")
+        response = client.get(
+            f"/practice/claims/{claim_practice_a.id}/payment",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No payment found for this claim"
+
+
 class TestClaimSubmissionIsolation:
     def test_practice_manager_claim_gets_their_practice_id(
         self, client, db, practice_manager_a, practice_a
