@@ -195,6 +195,40 @@ POST /internal/applications/{id}/review
 # Body: {"action": "APPROVE", "review_notes": "Verified practice information"}
 ```
 
+## Practice Financial Ontology (Phase 2)
+
+The Practice Portal includes a structured, queryable Dental Financial Ontology. This provides CFO-grade analytics, time-series and cohort modeling, a deterministic risk engine, and a relationship graph — all practice-scoped and without PHI.
+
+- Everything is an object (Practice, Claim, Payer, Procedure, PaymentIntent, Patient [de-identified])
+- Objects have relationships (CLAIM_BILLED_TO_PAYER, CLAIM_HAS_PROCEDURE, CLAIM_FUNDED_BY_PAYMENT_INTENT, CLAIM_BELONGS_TO_PATIENT)
+- Metrics are traceable to objects; all views are projections of the ontology
+- No PHI exposure: patient objects are de-identified (stable patient_hash)
+
+### Key Endpoints (Practice-scoped)
+
+```bash
+GET  /practices/{id}/ontology/context   # Snapshot with totals, funding, mixes, cohorts, denials, risks, patient dynamics
+POST /practices/{id}/ontology/rebuild   # Recompute ontology objects/links/kpis (fast)
+POST /practices/{id}/ontology/brief     # Deterministic brief (LLM optional)
+GET  /practices/{id}/ontology/cfo       # CFO 360° view (capital, revenue, payer risk, patient dynamics, ops risk, growth)
+GET  /practices/{id}/ontology/cohorts   # Time-series, rolling windows, aging buckets, lag curve, submission cohorts
+GET  /practices/{id}/ontology/risks     # Deterministic risk signals (severity, metric, value, explanation)
+GET  /practices/{id}/ontology/graph     # Graph projection (nodes + edges) for explorer UI
+```
+
+### Frontend (Practice Portal → Ontology tab)
+
+Sections:
+- CFO Snapshot (utilization, capacity, billed MTD, reimbursed MTD, 90d avg)
+- Time-Series Trends (30d rolling, cumulative billed/funded/confirmed)
+- Cohort Aging Panel (0–30/30–60/60–90/90+ and lag curve)
+- Patient Mix (age buckets, insurance type, repeat visit rate)
+- Risk Intelligence (deterministic rules; color-coded severity)
+- Ontology Brief (Generate Brief + Apply Adjust Limit recommendation)
+- Relationship Explorer (interactive canvas graph)
+
+No new env vars are required for Phase 2; all endpoints remain practice-scoped and honor tenant isolation.
+
 ## Multi-Tenancy and Security
 
 **practice_id from JWT**: For `PRACTICE_MANAGER` users, `practice_id` is derived from the JWT token. It is never accepted from request payloads.

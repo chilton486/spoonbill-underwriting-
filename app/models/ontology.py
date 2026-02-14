@@ -18,6 +18,7 @@ class OntologyObjectType(str, Enum):
     PAYMENT_INTENT = "PaymentIntent"
     LEDGER_ENTRY = "LedgerEntry"
     KPI_OBSERVATION = "KPIObservation"
+    PATIENT = "Patient"
 
 
 class OntologyLinkType(str, Enum):
@@ -26,6 +27,7 @@ class OntologyLinkType(str, Enum):
     CLAIM_FUNDED_BY_PAYMENT_INTENT = "CLAIM_FUNDED_BY_PAYMENT_INTENT"
     CLAIM_RESULTED_IN_DENIAL = "CLAIM_RESULTED_IN_DENIAL"
     CLAIM_RESULTED_IN_REMITTANCE = "CLAIM_RESULTED_IN_REMITTANCE"
+    CLAIM_BELONGS_TO_PATIENT = "CLAIM_BELONGS_TO_PATIENT"
 
 
 class OntologyObject(Base):
@@ -77,4 +79,21 @@ class KPIObservation(Base):
     __table_args__ = (
         Index("idx_kpi_observations_practice_metric", "practice_id", "metric_name"),
         Index("idx_kpi_observations_date", "as_of_date"),
+    )
+
+
+class MetricTimeseries(Base):
+    __tablename__ = "metric_timeseries"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    practice_id = Column(Integer, ForeignKey("practices.id"), nullable=False)
+    metric_name = Column(String(100), nullable=False)
+    date = Column(Date, nullable=False)
+    value = Column(Numeric, nullable=True)
+    metadata_json = Column(JSONB, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("idx_metric_ts_practice_metric_date", "practice_id", "metric_name", "date"),
+        Index("idx_metric_ts_practice_date", "practice_id", "date"),
     )
