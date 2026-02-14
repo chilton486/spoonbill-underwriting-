@@ -22,6 +22,7 @@ const statusColors = {
   COLLECTING: 'info',
   CLOSED: 'default',
   DECLINED: 'error',
+  PAYMENT_EXCEPTION: 'error',
 };
 
 function ClaimsList({ claims, onClaimSelect, onSubmitClick, onFilterChange }) {

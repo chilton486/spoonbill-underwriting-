@@ -170,6 +170,30 @@ export const getPaymentStatus = async (claimId) => {
   return response.json();
 };
 
+export const getDashboard = async () => {
+  const response = await fetch(`${API_BASE_URL}/practice/dashboard`, {
+    headers: headers(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch dashboard');
+  }
+
+  return response.json();
+};
+
+export const listPayments = async () => {
+  const response = await fetch(`${API_BASE_URL}/practice/payments`, {
+    headers: headers(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch payments');
+  }
+
+  return response.json();
+};
+
 export const validateInviteToken = async (token) => {
   const response = await fetch(`${API_BASE_URL}/public/invites/${token}`);
 

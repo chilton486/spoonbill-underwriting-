@@ -78,6 +78,34 @@ class TestStateMachine:
         with pytest.raises(InvalidStatusTransitionError):
             validate_status_transition(ClaimStatus.NEW, ClaimStatus.NEW)
 
+    def test_approved_can_transition_to_payment_exception(self):
+        assert can_transition(ClaimStatus.APPROVED, ClaimStatus.PAYMENT_EXCEPTION)
+
+    def test_payment_exception_can_transition_to_approved(self):
+        assert can_transition(ClaimStatus.PAYMENT_EXCEPTION, ClaimStatus.APPROVED)
+
+    def test_payment_exception_can_transition_to_declined(self):
+        assert can_transition(ClaimStatus.PAYMENT_EXCEPTION, ClaimStatus.DECLINED)
+
+    def test_payment_exception_cannot_transition_to_paid(self):
+        assert not can_transition(ClaimStatus.PAYMENT_EXCEPTION, ClaimStatus.PAID)
+
+    def test_payment_exception_cannot_transition_to_new(self):
+        assert not can_transition(ClaimStatus.PAYMENT_EXCEPTION, ClaimStatus.NEW)
+
+    def test_payment_exception_cannot_transition_to_closed(self):
+        assert not can_transition(ClaimStatus.PAYMENT_EXCEPTION, ClaimStatus.CLOSED)
+
+    def test_get_valid_transitions_from_payment_exception(self):
+        transitions = get_valid_transitions(ClaimStatus.PAYMENT_EXCEPTION)
+        assert ClaimStatus.APPROVED in transitions
+        assert ClaimStatus.DECLINED in transitions
+        assert ClaimStatus.PAID not in transitions
+        assert len(transitions) == 2
+
+    def test_payment_exception_is_not_terminal(self):
+        assert ClaimStatus.PAYMENT_EXCEPTION not in TERMINAL_STATUSES
+
     def test_all_statuses_have_transitions_defined(self):
         for status in ClaimStatus:
             assert status in CLAIM_STATUS_TRANSITIONS

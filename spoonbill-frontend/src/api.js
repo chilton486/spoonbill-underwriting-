@@ -204,6 +204,24 @@ export async function reissueInvite(practiceId, userId = null) {
   })
 }
 
+export async function cancelPayment(paymentId, reason = 'Cancelled by admin') {
+  return request(`/api/payments/${paymentId}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  })
+}
+
+export async function resolvePayment(paymentId, resolutionNote = 'Manually resolved') {
+  return request(`/api/payments/${paymentId}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ resolution_note: resolutionNote })
+  })
+}
+
+export async function getPaymentExceptions() {
+  return request('/api/claims?status=PAYMENT_EXCEPTION')
+}
+
 // Search API
 export async function searchClaims(query, status = null, practiceId = null) {
   const params = new URLSearchParams()
