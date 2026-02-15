@@ -37,14 +37,14 @@ def get_ontology_context(
     except Exception as e:
         db.rollback()
         logger.error("ontology build failed for practice %s: %s", practice_id, e)
-        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
 
     try:
         context = OntologyBuilderV2.get_practice_context(db, practice_id)
         return context
     except Exception as e:
         logger.error("ontology context read failed for practice %s: %s", practice_id, e)
-        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
 
 
 @router.post("/{practice_id}/ontology/rebuild")
@@ -92,7 +92,7 @@ def get_ontology_cohorts(
         return OntologyBuilderV2.get_cohorts(db, practice_id)
     except Exception as e:
         logger.error("ontology cohorts failed for practice %s: %s", practice_id, e)
-        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
 
 
 @router.get("/{practice_id}/ontology/cfo")
@@ -106,7 +106,7 @@ def get_cfo_360(
         return OntologyBuilderV2.get_cfo_360(db, practice_id)
     except Exception as e:
         logger.error("ontology cfo failed for practice %s: %s", practice_id, e)
-        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
 
 
 @router.get("/{practice_id}/ontology/risks")
@@ -120,7 +120,7 @@ def get_ontology_risks(
         return OntologyBuilderV2.get_risks(db, practice_id)
     except Exception as e:
         logger.error("ontology risks failed for practice %s: %s", practice_id, e)
-        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
 
 
 @router.get("/{practice_id}/ontology/graph")
@@ -134,7 +134,7 @@ def get_ontology_graph(
         return OntologyBuilderV2.get_graph(db, practice_id)
     except Exception as e:
         logger.error("ontology graph failed for practice %s: %s", practice_id, e)
-        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
 
 
 class AdjustLimitRequest(BaseModel):

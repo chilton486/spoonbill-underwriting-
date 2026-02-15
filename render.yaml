@@ -7,7 +7,7 @@ services:
     name: spoonbill-api
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -24,6 +24,8 @@ services:
       - key: PRACTICE_PORTAL_BASE_URL
         sync: false
       - key: INTAKE_PORTAL_BASE_URL
+        sync: false
+      - key: RUN_MIGRATIONS_ON_STARTUP
         sync: false
     healthCheckPath: /health
 

@@ -165,7 +165,7 @@ def list_practices(
         logger.error("list_practices query failed: %s", e)
         raise HTTPException(
             status_code=503,
-            detail="Practice data unavailable — database migration may be pending",
+            detail="Practice data unavailable — database migration may be pending; see /diag",
         )
     
     result = []

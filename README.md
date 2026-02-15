@@ -379,7 +379,7 @@ If a practice manager's invite link has expired or was lost:
 
 ### Staging Debugging
 
-**`/diag` endpoint**: Hit `https://spoonbill-staging-api.onrender.com/diag` to inspect runtime CORS config, alembic revision, and environment. No authentication required. Returns:
+**`/diag` endpoint**: Hit `https://spoonbill-staging-api.onrender.com/diag` to inspect runtime CORS config, migration state, and environment. No authentication required. Returns:
 
 ```json
 {
@@ -389,9 +389,14 @@ If a practice manager's invite link has expired or was lost:
   "cors_allow_headers": ["*"],
   "cors_allow_credentials": false,
   "environment": "true",
-  "alembic_revision": "ontology_v2"
+  "current_revision": "ontology_v2",
+  "head_revision": "ontology_v2",
+  "migration_pending": false,
+  "run_migrations_on_startup_enabled": true
 }
 ```
+
+**Auto-migrations**: Set `RUN_MIGRATIONS_ON_STARTUP=true` on the Render API service. On startup, the API acquires a Postgres advisory lock (key `9142026`), runs `alembic upgrade head` programmatically, then releases the lock. If migrations fail, the process exits with non-zero code so Render restarts it (making the failure visible in logs). This only runs when the env var is explicitly set to `true`.
 
 **CORS env var**: `CORS_ALLOWED_ORIGINS` must include all staging frontend domains (comma-separated, no trailing slashes):
 
@@ -399,16 +404,15 @@ If a practice manager's invite link has expired or was lost:
 CORS_ALLOWED_ORIGINS=https://spoonbill-staging-portal.onrender.com,https://spoonbill-staging-internal.onrender.com,https://spoonbill-staging-intake.onrender.com
 ```
 
-**Migrations**: The Render start command runs `alembic upgrade head` before starting the server. If you see 503 errors with "migration may be pending", check `/diag` for the current `alembic_revision` and verify it matches the latest migration in `alembic/versions/`.
-
 **Common staging issues:**
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Status "--" in Safari DevTools | CORS preflight blocked | Check `/diag` origins match frontend domain exactly |
-| 503 "migration may be pending" | DB schema out of sync | Redeploy API (triggers `alembic upgrade head`) |
+| 503 "migration may be pending; see /diag" | DB schema out of sync | Set `RUN_MIGRATIONS_ON_STARTUP=true` and redeploy API |
 | 500 on `/api/practices` | Missing column from unapplied migration | Same as above |
 | "Load failed" in Ontology tab | Ontology tables missing | Same as above |
+| `/diag` shows `migration_pending: true` | Migrations not applied | Set `RUN_MIGRATIONS_ON_STARTUP=true` and redeploy |
 | Invite links show localhost | `PRACTICE_PORTAL_BASE_URL` not set | Set env var on API service |
 
 ## Local Development
@@ -483,6 +487,7 @@ alembic downgrade -1                                # rollback one
 | `PRACTICE_PORTAL_BASE_URL` | Yes (staging/prod) | `http://localhost:5174` | Base URL for invite set-password links |
 | `INTAKE_PORTAL_BASE_URL` | Yes (staging/prod) | `http://localhost:5175` | Intake Portal base URL |
 | `CORS_ALLOWED_ORIGINS` | Yes (staging/prod) | (none) | Comma-separated allowed origins |
+| `RUN_MIGRATIONS_ON_STARTUP` | Yes (staging) | (empty) | Set to `true` to auto-run alembic migrations on startup |
 | `UNDERWRITING_AMOUNT_THRESHOLD_CENTS` | No | `100000` ($1,000) | Amount requiring manual review |
 | `UNDERWRITING_AUTO_APPROVE_BELOW_CENTS` | No | `10000` ($100) | Auto-approve threshold |
 
