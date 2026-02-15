@@ -43,25 +43,28 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
     
     def get_cors_origins(self) -> list[str]:
-        """Get list of CORS allowed origins, combining defaults with env var."""
-        # Default local development origins
+        """Get list of CORS allowed origins, combining defaults with env var.
+
+        - Strips whitespace
+        - Removes trailing slashes
+        - Deduplicates
+        """
         default_origins = [
             "http://localhost:5173",
             "http://localhost:5174",
             "http://localhost:5175",
             "http://localhost:3000",
         ]
-        
+
+        all_origins = list(default_origins)
+
         if self.cors_allowed_origins:
-            # Parse comma-separated origins from env var
-            extra_origins = [
-                origin.strip() 
-                for origin in self.cors_allowed_origins.split(",") 
-                if origin.strip()
-            ]
-            return default_origins + extra_origins
-        
-        return default_origins
+            for origin in self.cors_allowed_origins.split(","):
+                cleaned = origin.strip().rstrip("/")
+                if cleaned and cleaned not in all_origins:
+                    all_origins.append(cleaned)
+
+        return all_origins
 
 
 @lru_cache()
