@@ -271,7 +271,7 @@ Spoonbill staging is deployed on Render with four services and one database.
 | Service name | `spoonbill-staging-api` |
 | Runtime | Python |
 | Build command | `pip install -r requirements.txt` |
-| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Start command | `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | Health check | `/health` |
 
 **Required environment variables:**
@@ -376,6 +376,40 @@ If a practice manager's invite link has expired or was lost:
 - **API not found**: `VITE_API_BASE_URL` must be set at build time (Vite embeds it during build). Changing it requires a redeploy.
 - **Database errors**: Verify `DATABASE_URL` is set and the Render PostgreSQL instance is accessible
 - **Invite links showing localhost**: Ensure `PRACTICE_PORTAL_BASE_URL` is set on the backend service
+
+### Staging Debugging
+
+**`/diag` endpoint**: Hit `https://spoonbill-staging-api.onrender.com/diag` to inspect runtime CORS config, alembic revision, and environment. No authentication required. Returns:
+
+```json
+{
+  "ok": true,
+  "cors_allow_origins": ["..."],
+  "cors_allow_methods": ["*"],
+  "cors_allow_headers": ["*"],
+  "cors_allow_credentials": false,
+  "environment": "true",
+  "alembic_revision": "ontology_v2"
+}
+```
+
+**CORS env var**: `CORS_ALLOWED_ORIGINS` must include all staging frontend domains (comma-separated, no trailing slashes):
+
+```
+CORS_ALLOWED_ORIGINS=https://spoonbill-staging-portal.onrender.com,https://spoonbill-staging-internal.onrender.com,https://spoonbill-staging-intake.onrender.com
+```
+
+**Migrations**: The Render start command runs `alembic upgrade head` before starting the server. If you see 503 errors with "migration may be pending", check `/diag` for the current `alembic_revision` and verify it matches the latest migration in `alembic/versions/`.
+
+**Common staging issues:**
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Status "--" in Safari DevTools | CORS preflight blocked | Check `/diag` origins match frontend domain exactly |
+| 503 "migration may be pending" | DB schema out of sync | Redeploy API (triggers `alembic upgrade head`) |
+| 500 on `/api/practices` | Missing column from unapplied migration | Same as above |
+| "Load failed" in Ontology tab | Ontology tables missing | Same as above |
+| Invite links show localhost | `PRACTICE_PORTAL_BASE_URL` not set | Set env var on API service |
 
 ## Local Development
 

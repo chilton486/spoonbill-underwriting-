@@ -531,3 +531,64 @@ class TestIntegration:
         assert isinstance(context["snapshot"]["risk_flags"], list)
         assert isinstance(context["snapshot"]["missing_data"], list)
         assert "patient_dynamics" in context["snapshot"]
+
+
+class TestCORSConfig:
+
+    def test_get_cors_origins_defaults(self):
+        from app.config import Settings
+        s = Settings(cors_allowed_origins=None)
+        origins = s.get_cors_origins()
+        assert "http://localhost:5173" in origins
+        assert "http://localhost:5174" in origins
+        assert "http://localhost:5175" in origins
+        assert "http://localhost:3000" in origins
+
+    def test_get_cors_origins_strips_whitespace(self):
+        from app.config import Settings
+        s = Settings(cors_allowed_origins=" https://portal.example.com , https://console.example.com ")
+        origins = s.get_cors_origins()
+        assert "https://portal.example.com" in origins
+        assert "https://console.example.com" in origins
+
+    def test_get_cors_origins_strips_trailing_slash(self):
+        from app.config import Settings
+        s = Settings(cors_allowed_origins="https://portal.example.com/")
+        origins = s.get_cors_origins()
+        assert "https://portal.example.com" in origins
+        assert "https://portal.example.com/" not in origins
+
+    def test_get_cors_origins_deduplicates(self):
+        from app.config import Settings
+        s = Settings(cors_allowed_origins="http://localhost:5173,http://localhost:5173")
+        origins = s.get_cors_origins()
+        assert origins.count("http://localhost:5173") == 1
+
+    def test_diag_endpoint_returns_cors_config(self):
+        from fastapi.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+        resp = client.get("/diag")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert isinstance(data["cors_allow_origins"], list)
+        assert data["cors_allow_methods"] == ["*"]
+        assert data["cors_allow_headers"] == ["*"]
+        assert data["cors_allow_credentials"] is False
+        assert "alembic_revision" in data
+
+    def test_options_preflight_returns_200(self):
+        from fastapi.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+        resp = client.options(
+            "/practices/1/ontology/context",
+            headers={
+                "Origin": "http://localhost:5174",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "Authorization,Content-Type",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("access-control-allow-origin") == "http://localhost:5174"

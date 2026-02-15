@@ -3,9 +3,12 @@
 Provides practice management, invite link retrieval, and reissue functionality.
 All endpoints require SPOONBILL_ADMIN or SPOONBILL_OPS role.
 """
+import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
@@ -156,9 +159,15 @@ def list_practices(
             )
         )
     
-    practices = query.order_by(Practice.created_at.desc()).all()
+    try:
+        practices = query.order_by(Practice.created_at.desc()).all()
+    except Exception as e:
+        logger.error("list_practices query failed: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="Practice data unavailable — database migration may be pending",
+        )
     
-    # Build response with additional computed fields
     result = []
     for practice in practices:
         # Get claim count

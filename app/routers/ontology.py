@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,8 @@ from ..services.ontology_v2 import OntologyBuilderV2
 from ..services.ontology_brief import generate_brief_from_context
 from ..services.audit import AuditService
 from .auth import require_practice_manager, require_spoonbill_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/practices", tags=["ontology"])
 
@@ -28,11 +31,20 @@ def get_ontology_context(
 ):
     _check_practice(current_user, practice_id)
 
-    OntologyBuilderV2.build_practice_ontology(db, practice_id, actor_user_id=current_user.id)
-    db.commit()
+    try:
+        OntologyBuilderV2.build_practice_ontology(db, practice_id, actor_user_id=current_user.id)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error("ontology build failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
 
-    context = OntologyBuilderV2.get_practice_context(db, practice_id)
-    return context
+    try:
+        context = OntologyBuilderV2.get_practice_context(db, practice_id)
+        return context
+    except Exception as e:
+        logger.error("ontology context read failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
 
 
 @router.post("/{practice_id}/ontology/rebuild")
@@ -76,7 +88,11 @@ def get_ontology_cohorts(
     current_user: User = Depends(require_practice_manager),
 ):
     _check_practice(current_user, practice_id)
-    return OntologyBuilderV2.get_cohorts(db, practice_id)
+    try:
+        return OntologyBuilderV2.get_cohorts(db, practice_id)
+    except Exception as e:
+        logger.error("ontology cohorts failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
 
 
 @router.get("/{practice_id}/ontology/cfo")
@@ -86,7 +102,11 @@ def get_cfo_360(
     current_user: User = Depends(require_practice_manager),
 ):
     _check_practice(current_user, practice_id)
-    return OntologyBuilderV2.get_cfo_360(db, practice_id)
+    try:
+        return OntologyBuilderV2.get_cfo_360(db, practice_id)
+    except Exception as e:
+        logger.error("ontology cfo failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
 
 
 @router.get("/{practice_id}/ontology/risks")
@@ -96,7 +116,11 @@ def get_ontology_risks(
     current_user: User = Depends(require_practice_manager),
 ):
     _check_practice(current_user, practice_id)
-    return OntologyBuilderV2.get_risks(db, practice_id)
+    try:
+        return OntologyBuilderV2.get_risks(db, practice_id)
+    except Exception as e:
+        logger.error("ontology risks failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
 
 
 @router.get("/{practice_id}/ontology/graph")
@@ -106,7 +130,11 @@ def get_ontology_graph(
     current_user: User = Depends(require_practice_manager),
 ):
     _check_practice(current_user, practice_id)
-    return OntologyBuilderV2.get_graph(db, practice_id)
+    try:
+        return OntologyBuilderV2.get_graph(db, practice_id)
+    except Exception as e:
+        logger.error("ontology graph failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending")
 
 
 class AdjustLimitRequest(BaseModel):
