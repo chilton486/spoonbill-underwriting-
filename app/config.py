@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     # LLM (OpenAI) for ontology briefs
     openai_api_key: str = ""
+
+    # Auto-run alembic migrations on startup (set to "true" in staging)
+    run_migrations_on_startup: str = ""
     
     class Config:
         env_file = ".env"

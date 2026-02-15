@@ -533,6 +533,31 @@ class TestIntegration:
         assert "patient_dynamics" in context["snapshot"]
 
 
+class TestMigrationState:
+
+    def test_get_migration_state_returns_expected_keys(self):
+        from app.database import engine
+        from app.utils.migrations import get_migration_state
+        state = get_migration_state(engine)
+        assert "current_revision" in state
+        assert "head_revision" in state
+        assert "migration_pending" in state
+        assert isinstance(state["migration_pending"], bool)
+
+    def test_get_head_revision_returns_string(self):
+        from app.utils.migrations import _get_head_revision
+        head = _get_head_revision()
+        assert isinstance(head, str)
+        assert head != "unknown"
+
+    def test_run_migrations_skips_when_disabled(self, capsys):
+        from unittest.mock import MagicMock
+        from app.utils.migrations import run_migrations_if_enabled
+        mock_engine = MagicMock()
+        run_migrations_if_enabled(mock_engine)
+        mock_engine.raw_connection.assert_not_called()
+
+
 class TestCORSConfig:
 
     def test_get_cors_origins_defaults(self):
@@ -576,7 +601,12 @@ class TestCORSConfig:
         assert data["cors_allow_methods"] == ["*"]
         assert data["cors_allow_headers"] == ["*"]
         assert data["cors_allow_credentials"] is False
-        assert "alembic_revision" in data
+        assert "current_revision" in data
+        assert "head_revision" in data
+        assert "migration_pending" in data
+        assert isinstance(data["migration_pending"], bool)
+        assert "run_migrations_on_startup_enabled" in data
+        assert isinstance(data["run_migrations_on_startup_enabled"], bool)
 
     def test_options_preflight_returns_200(self):
         from fastapi.testclient import TestClient

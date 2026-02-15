@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,8 +8,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router, internal_practices_router, ontology_router
-from .database import get_db
+from .database import engine, get_db
 from .config import get_settings
+from .utils.migrations import run_migrations_if_enabled, get_migration_state
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +20,20 @@ _cors_origins = settings.get_cors_origins()
 logger.info("CORS allowed origins: %s", _cors_origins)
 print(f"[startup] CORS allowed origins: {_cors_origins}")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    run_migrations_if_enabled(engine)
+    state = get_migration_state(engine)
+    print(f"[startup] Migration state: {state}")
+    yield
+
+
 app = FastAPI(
     title="Spoonbill Internal System of Record",
     description="Phase 4: Practice Onboarding with underwriting intake flow",
     version="4.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -66,16 +78,9 @@ def health_check(db: Session = Depends(get_db)):
 
 
 @app.get("/diag")
-def diagnostics(db: Session = Depends(get_db)):
+def diagnostics():
     """Runtime diagnostics endpoint (no secrets exposed)."""
-    alembic_revision = None
-    try:
-        result = db.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
-        row = result.fetchone()
-        if row:
-            alembic_revision = row[0]
-    except Exception:
-        alembic_revision = "unknown"
+    state = get_migration_state(engine)
 
     return {
         "ok": True,
@@ -84,5 +89,8 @@ def diagnostics(db: Session = Depends(get_db)):
         "cors_allow_headers": ["*"],
         "cors_allow_credentials": False,
         "environment": os.environ.get("RENDER", "local"),
-        "alembic_revision": alembic_revision,
+        "current_revision": state["current_revision"],
+        "head_revision": state["head_revision"],
+        "migration_pending": state["migration_pending"],
+        "run_migrations_on_startup_enabled": settings.run_migrations_on_startup.lower() == "true",
     }
