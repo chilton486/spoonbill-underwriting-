@@ -1082,6 +1082,10 @@ class OntologyBuilderV2:
     ) -> dict:
         from .cdt_families import get_cdt_family, ALL_FAMILIES
         objects = db.query(OntologyObject).filter(OntologyObject.practice_id == practice_id).all()
+        if not objects:
+            OntologyBuilderV2.build_practice_ontology(db, practice_id)
+            db.flush()
+            objects = db.query(OntologyObject).filter(OntologyObject.practice_id == practice_id).all()
         links = db.query(OntologyLink).filter(OntologyLink.practice_id == practice_id).all()
 
         obj_map = {str(o.id): o for o in objects}
