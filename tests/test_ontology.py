@@ -831,3 +831,39 @@ class TestGraphVNext:
         if payer_nodes:
             payer_names = [n["label"] for n in payer_nodes]
             assert "Delta" in payer_names
+
+    def test_graph_invalid_mode_raises(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", codes="D0120")
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+
+        import pytest
+        with pytest.raises(ValueError, match="Invalid graph mode"):
+            OntologyBuilderV2.get_graph(db, practice.id, mode="bogus_mode")
+
+    def test_graph_limit_capped_at_max(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", codes="D0120")
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+
+        graph = OntologyBuilderV2.get_graph(db, practice.id, limit=99999)
+        assert graph["filters"]["limit"] == OntologyBuilderV2.MAX_GRAPH_LIMIT
+
+    def test_graph_search_filters_nodes(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", codes="D0120")
+        _create_claim(db, practice.id, payer="Cigna", codes="D2140")
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+
+        full = OntologyBuilderV2.get_graph(db, practice.id)
+        searched = OntologyBuilderV2.get_graph(db, practice.id, search="Delta")
+        assert len(searched["nodes"]) <= len(full["nodes"])
+        assert searched["filters"]["search"] == "Delta"
+
+    def test_graph_filters_include_search_key(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", codes="D0120")
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+
+        graph = OntologyBuilderV2.get_graph(db, practice.id)
+        assert "search" in graph["filters"]
