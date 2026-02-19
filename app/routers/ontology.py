@@ -126,14 +126,69 @@ def get_ontology_risks(
 @router.get("/{practice_id}/ontology/graph")
 def get_ontology_graph(
     practice_id: int,
+    mode: str = "revenue_cycle",
+    range: str = "90d",
+    payer: Optional[str] = None,
+    state: Optional[str] = None,
+    limit: int = 150,
+    focus_node_id: Optional[str] = None,
+    hops: int = 2,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_practice_manager),
 ):
     _check_practice(current_user, practice_id)
     try:
-        return OntologyBuilderV2.get_graph(db, practice_id)
+        return OntologyBuilderV2.get_graph(
+            db, practice_id,
+            mode=mode, range_key=range, payer_filter=payer,
+            state_filter=state, limit=limit,
+            focus_node_id=focus_node_id, hops=hops,
+        )
     except Exception as e:
         logger.error("ontology graph failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
+
+
+@router.get("/{practice_id}/ontology/retention")
+def get_patient_retention(
+    practice_id: int,
+    range: str = "90d",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_practice_manager),
+):
+    _check_practice(current_user, practice_id)
+    try:
+        return OntologyBuilderV2.get_patient_retention(db, practice_id, range_key=range)
+    except Exception as e:
+        logger.error("ontology retention failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
+
+
+@router.get("/{practice_id}/ontology/reimbursement")
+def get_reimbursement_metrics(
+    practice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_practice_manager),
+):
+    _check_practice(current_user, practice_id)
+    try:
+        return OntologyBuilderV2.get_reimbursement_metrics(db, practice_id)
+    except Exception as e:
+        logger.error("ontology reimbursement failed for practice %s: %s", practice_id, e)
+        raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
+
+
+@router.get("/{practice_id}/ontology/rcm")
+def get_rcm_ops(
+    practice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_practice_manager),
+):
+    _check_practice(current_user, practice_id)
+    try:
+        return OntologyBuilderV2.get_rcm_ops(db, practice_id)
+    except Exception as e:
+        logger.error("ontology rcm failed for practice %s: %s", practice_id, e)
         raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
 
 

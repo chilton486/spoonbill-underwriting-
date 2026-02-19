@@ -871,55 +871,453 @@ class OntologyBuilderV2:
         return risks
 
     @staticmethod
-    def get_graph(db: Session, practice_id: int) -> dict:
+    def get_patient_retention(db: Session, practice_id: int, range_key: str = "90d") -> dict:
+        from .cdt_families import PREVENTIVE_CODES
+        claims = db.query(Claim).filter(Claim.practice_id == practice_id).all()
+        today = date.today()
+
+        range_days = {"30d": 30, "90d": 90, "12m": 365}.get(range_key, 90)
+        cutoff = today - timedelta(days=range_days)
+        cutoff_12m = today - timedelta(days=365)
+
+        patient_claims = defaultdict(list)
+        for c in claims:
+            p_hash = _patient_hash(c.patient_name, practice_id)
+            patient_claims[p_hash].append(c)
+
+        active_12m = set()
+        for p_hash, p_claims in patient_claims.items():
+            for c in p_claims:
+                if c.created_at and c.created_at.date() >= cutoff_12m:
+                    active_12m.add(p_hash)
+                    break
+
+        new_patients = set()
+        returning_patients = set()
+        for p_hash in active_12m:
+            dates = sorted([c.created_at for c in patient_claims[p_hash] if c.created_at])
+            if dates and (today - dates[0].date()).days <= 90:
+                new_patients.add(p_hash)
+            else:
+                returning_patients.add(p_hash)
+
+        repeat_90d = 0
+        repeat_180d = 0
+        cutoff_90 = today - timedelta(days=90)
+        cutoff_180 = today - timedelta(days=180)
+        for p_hash in active_12m:
+            c90 = [c for c in patient_claims[p_hash] if c.created_at and c.created_at.date() >= cutoff_90]
+            if len(c90) >= 2:
+                repeat_90d += 1
+            c180 = [c for c in patient_claims[p_hash] if c.created_at and c.created_at.date() >= cutoff_180]
+            if len(c180) >= 2:
+                repeat_180d += 1
+
+        reactivated = set()
+        cutoff_30d = today - timedelta(days=30)
+        gap_cutoff = today - timedelta(days=180)
+        for p_hash, p_claims in patient_claims.items():
+            dates = sorted([c.created_at for c in p_claims if c.created_at])
+            if len(dates) < 2:
+                continue
+            recent = [d for d in dates if d.date() >= cutoff_30d]
+            old = [d for d in dates if d.date() < gap_cutoff]
+            if recent and old:
+                reactivated.add(p_hash)
+
+        overdue_recall = []
+        for p_hash, p_claims in patient_claims.items():
+            has_preventive = False
+            last_preventive_date = None
+            for c in p_claims:
+                if c.procedure_codes:
+                    for code in c.procedure_codes.split(","):
+                        code = code.strip().upper()
+                        if code in PREVENTIVE_CODES:
+                            has_preventive = True
+                            if c.created_at:
+                                if last_preventive_date is None or c.created_at > last_preventive_date:
+                                    last_preventive_date = c.created_at
+            if has_preventive and last_preventive_date:
+                months_since = (today - last_preventive_date.date()).days / 30.0
+                if months_since >= 6:
+                    overdue_recall.append({
+                        "patient_hash": p_hash,
+                        "months_since_last_preventive": round(months_since, 1),
+                    })
+
+        patient_value = []
+        for p_hash in active_12m:
+            billed_12m = sum(
+                c.amount_cents for c in patient_claims[p_hash]
+                if c.created_at and c.created_at.date() >= cutoff_12m
+            )
+            patient_value.append({"patient_hash": p_hash, "billed_12m_cents": billed_12m})
+        patient_value.sort(key=lambda x: -x["billed_12m_cents"])
+
+        active_count = len(active_12m)
+        return {
+            "active_patients_12mo": active_count,
+            "new_patients": len(new_patients),
+            "returning_patients": len(returning_patients),
+            "repeat_visit_rate_90d": round(repeat_90d / active_count, 4) if active_count else 0,
+            "repeat_visit_rate_180d": round(repeat_180d / active_count, 4) if active_count else 0,
+            "reactivation_rate": round(len(reactivated) / active_count, 4) if active_count else 0,
+            "overdue_recall_cohorts": overdue_recall[:20],
+            "patient_value_proxy": patient_value[:20],
+        }
+
+    @staticmethod
+    def get_reimbursement_metrics(db: Session, practice_id: int) -> dict:
+        from .cdt_families import get_cdt_family
+        claims = db.query(Claim).filter(Claim.practice_id == practice_id).all()
+        payments = db.query(PaymentIntent).filter(PaymentIntent.practice_id == practice_id).all()
+        payment_map = {p.claim_id: p for p in payments}
+
+        by_payer = defaultdict(lambda: {"billed": 0, "paid": 0, "denied": 0, "total": 0})
+        by_family = defaultdict(lambda: {"billed": 0, "paid": 0, "denied": 0, "total": 0})
+        adjudication_lags_by_payer = defaultdict(list)
+
+        for c in claims:
+            payer = c.payer or "Unknown"
+            by_payer[payer]["total"] += 1
+            by_payer[payer]["billed"] += c.amount_cents
+            if c.status == ClaimStatus.DECLINED.value:
+                by_payer[payer]["denied"] += 1
+
+            p = payment_map.get(c.id)
+            if p and p.status == PaymentIntentStatus.CONFIRMED.value:
+                by_payer[payer]["paid"] += p.amount_cents
+                if p.confirmed_at and p.sent_at:
+                    lag = (p.confirmed_at - p.sent_at).total_seconds() / 86400.0
+                    adjudication_lags_by_payer[payer].append(lag)
+
+            if c.procedure_codes:
+                for code in c.procedure_codes.split(","):
+                    family = get_cdt_family(code.strip())
+                    by_family[family]["total"] += 1
+                    by_family[family]["billed"] += c.amount_cents
+                    if c.status == ClaimStatus.DECLINED.value:
+                        by_family[family]["denied"] += 1
+                    if p and p.status == PaymentIntentStatus.CONFIRMED.value:
+                        by_family[family]["paid"] += p.amount_cents
+
+        reimbursement_by_payer = {}
+        for payer, d in by_payer.items():
+            reimbursement_by_payer[payer] = {
+                "realized_rate": round(d["paid"] / d["billed"], 4) if d["billed"] else "missing_data",
+                "denial_rate": round(d["denied"] / d["total"], 4) if d["total"] else 0,
+                "billed_cents": d["billed"],
+                "paid_cents": d["paid"],
+                "claim_count": d["total"],
+            }
+
+        reimbursement_by_family = {}
+        for family, d in by_family.items():
+            reimbursement_by_family[family] = {
+                "realized_rate": round(d["paid"] / d["billed"], 4) if d["billed"] else "missing_data",
+                "denial_rate": round(d["denied"] / d["total"], 4) if d["total"] else 0,
+                "billed_cents": d["billed"],
+                "paid_cents": d["paid"],
+            }
+
+        time_to_adjudication = {}
+        for payer, lags in adjudication_lags_by_payer.items():
+            if not lags:
+                time_to_adjudication[payer] = "missing_data"
+                continue
+            lags.sort()
+            p50 = lags[len(lags) // 2]
+            p90_idx = min(int(len(lags) * 0.9), len(lags) - 1)
+            time_to_adjudication[payer] = {"p50_days": round(p50, 2), "p90_days": round(lags[p90_idx], 2)}
+
+        return {
+            "by_payer": reimbursement_by_payer,
+            "by_procedure_family": reimbursement_by_family,
+            "time_to_adjudication": time_to_adjudication,
+        }
+
+    @staticmethod
+    def get_rcm_ops(db: Session, practice_id: int) -> dict:
+        claims = db.query(Claim).filter(Claim.practice_id == practice_id).all()
+        today = date.today()
+
+        aging = {"0_30": [], "30_60": [], "60_90": [], "90_plus": []}
+        for c in claims:
+            if c.status in (ClaimStatus.CLOSED.value, ClaimStatus.DECLINED.value):
+                continue
+            age_days = (today - c.created_at.date()).days if c.created_at else 0
+            bucket = "0_30" if age_days <= 30 else "30_60" if age_days <= 60 else "60_90" if age_days <= 90 else "90_plus"
+            aging[bucket].append({"claim_token": c.claim_token, "status": c.status, "amount_cents": c.amount_cents, "age_days": age_days})
+
+        aging_summary = {k: {"count": len(v), "total_cents": sum(i["amount_cents"] for i in v)} for k, v in aging.items()}
+
+        total = len(claims)
+        exceptions = [c for c in claims if c.status == ClaimStatus.PAYMENT_EXCEPTION.value]
+        declined = [c for c in claims if c.status == ClaimStatus.DECLINED.value]
+        exception_rate = round((len(exceptions) + len(declined)) / total, 4) if total else 0
+
+        return {
+            "claims_aging_buckets": aging_summary,
+            "exception_rate": exception_rate,
+            "exception_count": len(exceptions),
+            "declined_count": len(declined),
+            "total_claims": total,
+            "forecasted_cash_in_7d": "missing_data",
+            "forecasted_cash_in_14d": "missing_data",
+            "forecasted_cash_in_30d": "missing_data",
+        }
+
+    @staticmethod
+    def get_graph(
+        db: Session,
+        practice_id: int,
+        mode: str = "revenue_cycle",
+        range_key: str = "90d",
+        payer_filter: str = None,
+        state_filter: str = None,
+        limit: int = 150,
+        focus_node_id: str = None,
+        hops: int = 2,
+    ) -> dict:
+        from .cdt_families import get_cdt_family, ALL_FAMILIES
         objects = db.query(OntologyObject).filter(OntologyObject.practice_id == practice_id).all()
         links = db.query(OntologyLink).filter(OntologyLink.practice_id == practice_id).all()
 
-        node_types = {
-            OntologyObjectType.PRACTICE.value,
-            OntologyObjectType.PAYER.value,
-            OntologyObjectType.PATIENT.value,
-            OntologyObjectType.PROCEDURE.value,
-            OntologyObjectType.PAYMENT_INTENT.value,
+        obj_map = {str(o.id): o for o in objects}
+        link_list = links
+
+        EDGE_LABELS = {
+            OntologyLinkType.CLAIM_BILLED_TO_PAYER.value: "billed to",
+            OntologyLinkType.CLAIM_HAS_PROCEDURE.value: "includes",
+            OntologyLinkType.CLAIM_FUNDED_BY_PAYMENT_INTENT.value: "funded by",
+            OntologyLinkType.CLAIM_RESULTED_IN_DENIAL.value: "denied by",
+            OntologyLinkType.CLAIM_RESULTED_IN_REMITTANCE.value: "remitted",
+            OntologyLinkType.CLAIM_BELONGS_TO_PATIENT.value: "belongs to",
         }
 
-        patient_objs = [o for o in objects if o.object_type == OntologyObjectType.PATIENT.value]
-        patient_objs.sort(key=lambda o: (o.properties_json or {}).get("lifetime_billed_cents", 0), reverse=True)
-        top_patient_ids = {o.id for o in patient_objs[:10]}
+        MODE_TYPES = {
+            "revenue_cycle": {
+                OntologyObjectType.PRACTICE.value,
+                OntologyObjectType.PAYER.value,
+                OntologyObjectType.CLAIM.value,
+                OntologyObjectType.PAYMENT_INTENT.value,
+                OntologyObjectType.PROCEDURE.value,
+            },
+            "patient_retention": {
+                OntologyObjectType.PRACTICE.value,
+                OntologyObjectType.PATIENT.value,
+                OntologyObjectType.CLAIM.value,
+                OntologyObjectType.PAYER.value,
+                OntologyObjectType.PROCEDURE.value,
+            },
+            "reimbursement_insights": {
+                OntologyObjectType.PRACTICE.value,
+                OntologyObjectType.PAYER.value,
+                OntologyObjectType.CLAIM.value,
+                OntologyObjectType.PROCEDURE.value,
+                OntologyObjectType.PAYMENT_INTENT.value,
+            },
+        }
 
-        claim_objs = [o for o in objects if o.object_type == OntologyObjectType.CLAIM.value]
-        claim_objs.sort(key=lambda o: (o.properties_json or {}).get("amount_cents", 0), reverse=True)
-        top_claim_ids = {o.id for o in claim_objs[:20]}
+        allowed_types = MODE_TYPES.get(mode, MODE_TYPES["revenue_cycle"])
 
-        pi_objs = [o for o in objects if o.object_type == OntologyObjectType.PAYMENT_INTENT.value]
-        pi_objs.sort(key=lambda o: (o.properties_json or {}).get("amount_cents", 0), reverse=True)
-        top_pi_ids = {o.id for o in pi_objs[:10]}
+        range_days = {"30d": 30, "90d": 90, "12m": 365}.get(range_key, 90)
+        range_cutoff = date.today() - timedelta(days=range_days)
 
-        nodes = []
+        def _in_range(o):
+            if o.object_type == OntologyObjectType.PRACTICE.value:
+                return True
+            props = o.properties_json or {}
+            created = props.get("created_at")
+            if created:
+                try:
+                    d = datetime.fromisoformat(created).date() if isinstance(created, str) else created
+                    return d >= range_cutoff
+                except (ValueError, TypeError):
+                    pass
+            return True
+
+        def _payer_match(o):
+            if not payer_filter:
+                return True
+            if o.object_type == OntologyObjectType.PAYER.value:
+                return (o.properties_json or {}).get("name", "").lower() == payer_filter.lower()
+            if o.object_type == OntologyObjectType.CLAIM.value:
+                return (o.properties_json or {}).get("payer", "").lower() == payer_filter.lower()
+            return True
+
+        def _state_match(o):
+            if not state_filter:
+                return True
+            if o.object_type == OntologyObjectType.CLAIM.value:
+                return (o.properties_json or {}).get("status", "") == state_filter
+            return True
+
+        filtered_objs = [
+            o for o in objects
+            if o.object_type in allowed_types and _in_range(o) and _payer_match(o) and _state_match(o)
+        ]
+
+        if focus_node_id:
+            focus_ids = {focus_node_id}
+            adj = defaultdict(set)
+            for link in link_list:
+                f = str(link.from_object_id)
+                t = str(link.to_object_id)
+                adj[f].add(t)
+                adj[t].add(f)
+            frontier = {focus_node_id}
+            for _ in range(hops):
+                next_frontier = set()
+                for nid in frontier:
+                    next_frontier |= adj.get(nid, set())
+                focus_ids |= next_frontier
+                frontier = next_frontier - focus_ids
+            filtered_objs = [o for o in filtered_objs if str(o.id) in focus_ids]
+
+        def _node_label(o):
+            props = o.properties_json or {}
+            if o.object_type == OntologyObjectType.PRACTICE.value:
+                return props.get("name", "Practice")
+            if o.object_type == OntologyObjectType.PAYER.value:
+                return props.get("name", "Payer")
+            if o.object_type == OntologyObjectType.PATIENT.value:
+                return f"Patient ...{props.get('patient_hash', '?')[-4:]}"
+            if o.object_type == OntologyObjectType.CLAIM.value:
+                return props.get("claim_token", "Claim")[:12]
+            if o.object_type == OntologyObjectType.PROCEDURE.value:
+                code = props.get("cdt_code", "")
+                return f"{code} ({get_cdt_family(code)})" if code else "Procedure"
+            if o.object_type == OntologyObjectType.PAYMENT_INTENT.value:
+                return f"Payment ${(props.get('amount_cents', 0) / 100):.0f}"
+            return o.object_key or o.object_type
+
+        def _subtitle_stat(o):
+            props = o.properties_json or {}
+            if o.object_type == OntologyObjectType.CLAIM.value:
+                amt = props.get("amount_cents", 0)
+                return f"${amt / 100:,.0f}" if amt else None
+            if o.object_type == OntologyObjectType.PATIENT.value:
+                return f"{props.get('claim_count', 0)} claims"
+            if o.object_type == OntologyObjectType.PAYER.value:
+                return None
+            if o.object_type == OntologyObjectType.PAYMENT_INTENT.value:
+                return props.get("status", "")
+            return None
+
+        procedure_family_aggregation = {}
+        if len(filtered_objs) > limit:
+            proc_objs = [o for o in filtered_objs if o.object_type == OntologyObjectType.PROCEDURE.value]
+            non_proc = [o for o in filtered_objs if o.object_type != OntologyObjectType.PROCEDURE.value]
+
+            family_groups = defaultdict(list)
+            for o in proc_objs:
+                code = (o.properties_json or {}).get("cdt_code", "")
+                fam = get_cdt_family(code)
+                family_groups[fam].append(o)
+
+            aggregated_proc_nodes = []
+            for fam, members in family_groups.items():
+                agg_id = f"family:{fam}"
+                procedure_family_aggregation[agg_id] = [str(m.id) for m in members]
+                agg_node_data = {
+                    "id": agg_id,
+                    "type": "ProcedureFamily",
+                    "label": fam,
+                    "subtitle_stat": f"{len(members)} codes",
+                    "properties": {"family": fam, "code_count": len(members), "codes": [((m.properties_json or {}).get("cdt_code", "")) for m in members[:10]]},
+                    "provenance": {"source": "aggregation", "version": "ontology-v2.1"},
+                }
+                aggregated_proc_nodes.append(agg_node_data)
+
+            claim_objs_sorted = sorted(
+                [o for o in non_proc if o.object_type == OntologyObjectType.CLAIM.value],
+                key=lambda o: (o.properties_json or {}).get("amount_cents", 0), reverse=True,
+            )
+            patient_objs_sorted = sorted(
+                [o for o in non_proc if o.object_type == OntologyObjectType.PATIENT.value],
+                key=lambda o: (o.properties_json or {}).get("lifetime_billed_cents", 0), reverse=True,
+            )
+            pi_objs_sorted = sorted(
+                [o for o in non_proc if o.object_type == OntologyObjectType.PAYMENT_INTENT.value],
+                key=lambda o: (o.properties_json or {}).get("amount_cents", 0), reverse=True,
+            )
+            other = [o for o in non_proc if o.object_type not in (OntologyObjectType.CLAIM.value, OntologyObjectType.PATIENT.value, OntologyObjectType.PAYMENT_INTENT.value)]
+
+            budget = max(limit - len(other) - len(aggregated_proc_nodes), 10)
+            claim_budget = int(budget * 0.5)
+            patient_budget = int(budget * 0.3)
+            pi_budget = budget - claim_budget - patient_budget
+
+            trimmed = other + claim_objs_sorted[:claim_budget] + patient_objs_sorted[:patient_budget] + pi_objs_sorted[:pi_budget]
+            filtered_objs = trimmed
+        else:
+            procedure_family_aggregation = {}
+
         included_ids = set()
-        for o in objects:
-            if o.object_type in (OntologyObjectType.PRACTICE.value, OntologyObjectType.PAYER.value, OntologyObjectType.PROCEDURE.value):
-                nodes.append({"id": str(o.id), "type": o.object_type, "key": o.object_key, "properties": o.properties_json or {}})
-                included_ids.add(o.id)
-            elif o.object_type == OntologyObjectType.PATIENT.value and o.id in top_patient_ids:
-                nodes.append({"id": str(o.id), "type": o.object_type, "key": o.object_key, "properties": o.properties_json or {}})
-                included_ids.add(o.id)
-            elif o.object_type == OntologyObjectType.CLAIM.value and o.id in top_claim_ids:
-                nodes.append({"id": str(o.id), "type": o.object_type, "key": o.object_key, "properties": o.properties_json or {}})
-                included_ids.add(o.id)
-            elif o.object_type == OntologyObjectType.PAYMENT_INTENT.value and o.id in top_pi_ids:
-                nodes.append({"id": str(o.id), "type": o.object_type, "key": o.object_key, "properties": o.properties_json or {}})
-                included_ids.add(o.id)
+        nodes = []
+        for o in filtered_objs:
+            node = {
+                "id": str(o.id),
+                "type": o.object_type,
+                "label": _node_label(o),
+                "subtitle_stat": _subtitle_stat(o),
+                "properties": o.properties_json or {},
+                "provenance": {"source": "ontology_rebuild", "version": "ontology-v2.1"},
+            }
+            nodes.append(node)
+            included_ids.add(str(o.id))
+
+        if procedure_family_aggregation:
+            for agg_id, member_ids in procedure_family_aggregation.items():
+                fam = agg_id.replace("family:", "")
+                nodes.append({
+                    "id": agg_id,
+                    "type": "ProcedureFamily",
+                    "label": fam,
+                    "subtitle_stat": f"{len(member_ids)} codes",
+                    "properties": {"family": fam, "code_count": len(member_ids)},
+                    "provenance": {"source": "aggregation", "version": "ontology-v2.1"},
+                })
+                included_ids.add(agg_id)
+
+        member_to_family = {}
+        for agg_id, member_ids in procedure_family_aggregation.items():
+            for mid in member_ids:
+                member_to_family[mid] = agg_id
 
         edges = []
-        for link in links:
-            if link.from_object_id in included_ids and link.to_object_id in included_ids:
+        seen_edges = set()
+        for link in link_list:
+            from_id = str(link.from_object_id)
+            to_id = str(link.to_object_id)
+
+            if from_id in member_to_family:
+                from_id = member_to_family[from_id]
+            if to_id in member_to_family:
+                to_id = member_to_family[to_id]
+
+            if from_id in included_ids and to_id in included_ids:
+                edge_key = f"{from_id}-{to_id}-{link.link_type}"
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
                 edges.append({
                     "id": str(link.id),
                     "type": link.link_type,
-                    "from": str(link.from_object_id),
-                    "to": str(link.to_object_id),
+                    "type_label": EDGE_LABELS.get(link.link_type, link.link_type),
+                    "from": from_id,
+                    "to": to_id,
                     "properties": link.properties_json or {},
+                    "provenance": {"source": "ontology_rebuild", "version": "ontology-v2.1"},
                 })
 
-        return {"nodes": nodes, "edges": edges}
+        return {
+            "version": "ontology-v2.1",
+            "mode": mode,
+            "filters": {"range": range_key, "payer": payer_filter, "state": state_filter, "limit": limit},
+            "nodes": nodes,
+            "edges": edges,
+            "aggregations": {k: len(v) for k, v in procedure_family_aggregation.items()} if procedure_family_aggregation else None,
+        }
