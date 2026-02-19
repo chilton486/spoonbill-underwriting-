@@ -457,7 +457,7 @@ class TestGraphExplorer:
         for node in graph["nodes"]:
             assert "id" in node
             assert "type" in node
-            assert "key" in node
+            assert "label" in node
             assert "properties" in node
 
 
