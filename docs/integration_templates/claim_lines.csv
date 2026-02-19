@@ -1,0 +1,9 @@
+external_claim_id,external_line_id,cdt_code,description,line_amount_cents,tooth_number,surface
+OD-CLM-1001,LN-1001-1,D0120,Periodic oral evaluation,5000,,
+OD-CLM-1001,LN-1001-2,D1110,Prophylaxis - adult,40000,,
+OD-CLM-1002,LN-1002-1,D2740,Crown - porcelain/ceramic,120000,14,
+OD-CLM-1003,LN-1003-1,D2950,Core buildup,35000,19,
+OD-CLM-1003,LN-1003-2,D2740,Crown - porcelain/ceramic,50000,19,
+OD-CLM-1004,LN-1004-1,D0274,Bitewings - four radiographic images,32000,,
+OD-CLM-1005,LN-1005-1,D4341,Periodontal scaling - 4+ teeth per quadrant,35000,,
+OD-CLM-1005,LN-1005-2,D4342,Periodontal scaling - 1-3 teeth per quadrant,32500,,

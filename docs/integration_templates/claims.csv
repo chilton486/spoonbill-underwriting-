@@ -1,0 +1,6 @@
+external_claim_id,external_patient_id,payer,total_billed_cents,procedure_date,submitted_date,procedure_codes
+OD-CLM-1001,PAT-101,Delta Dental,45000,2026-01-15,2026-01-16,"D0120,D1110"
+OD-CLM-1002,PAT-102,MetLife,120000,2026-01-18,2026-01-19,"D2740"
+OD-CLM-1003,PAT-103,Cigna Dental,85000,2026-01-20,2026-01-21,"D2950,D2740"
+OD-CLM-1004,PAT-101,Delta Dental,32000,2026-02-01,2026-02-02,"D0274"
+OD-CLM-1005,PAT-104,Aetna,67500,2026-02-05,2026-02-06,"D4341,D4342"
