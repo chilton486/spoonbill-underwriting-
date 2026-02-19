@@ -9,6 +9,7 @@ from .ledger import LedgerAccount, LedgerAccountType, LedgerEntry, LedgerEntryDi
 from .practice_application import PracticeApplication, ApplicationStatus, PracticeType, BillingModel, UrgencyLevel
 from .invite import PracticeManagerInvite
 from .ontology import OntologyObject, OntologyObjectType, OntologyLink, OntologyLinkType, KPIObservation
+from .integration import IntegrationConnection, IntegrationSyncRun, IntegrationProvider, IntegrationStatus, SyncRunStatus
 
 __all__ = [
     "User",

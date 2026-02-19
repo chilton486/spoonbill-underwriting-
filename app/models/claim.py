@@ -50,6 +50,7 @@ class Claim(Base):
     fingerprint = Column(String(255), unique=True, index=True, nullable=True)
     
     external_claim_id = Column(String(255), nullable=True, index=True)
+    external_source = Column(String(50), nullable=True)
     procedure_codes = Column(String(500), nullable=True)
     
     claim_token = Column(String(20), unique=True, index=True, nullable=False)

@@ -294,6 +294,54 @@ export const getOntologyGraph = async (practiceId) => {
   return response.json();
 };
 
+export const getIntegrationStatus = async () => {
+  const response = await fetch(`${API_BASE_URL}/practice/integrations/open-dental/status`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch integration status');
+  return response.json();
+};
+
+export const uploadIntegrationCSV = async (claimsFile, linesFile) => {
+  const formData = new FormData();
+  formData.append('claims_file', claimsFile);
+  if (linesFile) {
+    formData.append('lines_file', linesFile);
+  }
+
+  const h = {};
+  if (authToken) {
+    h['Authorization'] = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/practice/integrations/open-dental/upload`, {
+    method: 'POST',
+    headers: h,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'CSV upload failed');
+  }
+
+  return response.json();
+};
+
+export const runIntegrationSync = async () => {
+  const response = await fetch(`${API_BASE_URL}/practice/integrations/open-dental/sync`, {
+    method: 'POST',
+    headers: headers(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Sync failed');
+  }
+
+  return response.json();
+};
+
 export const validateInviteToken = async (token) => {
   const response = await fetch(`${API_BASE_URL}/public/invites/${token}`);
 
