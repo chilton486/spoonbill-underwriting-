@@ -1068,6 +1068,9 @@ class OntologyBuilderV2:
             "forecasted_cash_in_30d": "missing_data",
         }
 
+    VALID_GRAPH_MODES = {"revenue_cycle", "patient_retention", "reimbursement_insights"}
+    MAX_GRAPH_LIMIT = 500
+
     @staticmethod
     def get_graph(
         db: Session,
@@ -1079,8 +1082,15 @@ class OntologyBuilderV2:
         limit: int = 150,
         focus_node_id: str = None,
         hops: int = 2,
+        search: str = None,
     ) -> dict:
         from .cdt_families import get_cdt_family, ALL_FAMILIES
+
+        if mode not in OntologyBuilderV2.VALID_GRAPH_MODES:
+            raise ValueError(f"Invalid graph mode '{mode}'. Valid modes: {sorted(OntologyBuilderV2.VALID_GRAPH_MODES)}")
+
+        limit = max(1, min(limit, OntologyBuilderV2.MAX_GRAPH_LIMIT))
+
         objects = db.query(OntologyObject).filter(OntologyObject.practice_id == practice_id).all()
         if not objects:
             OntologyBuilderV2.build_practice_ontology(db, practice_id)
@@ -1124,7 +1134,7 @@ class OntologyBuilderV2:
             },
         }
 
-        allowed_types = MODE_TYPES.get(mode, MODE_TYPES["revenue_cycle"])
+        allowed_types = MODE_TYPES[mode]
 
         range_days = {"30d": 30, "90d": 90, "12m": 365}.get(range_key, 90)
         range_cutoff = date.today() - timedelta(days=range_days)
@@ -1158,9 +1168,19 @@ class OntologyBuilderV2:
                 return (o.properties_json or {}).get("status", "") == state_filter
             return True
 
+        def _search_match(o):
+            if not search:
+                return True
+            q = search.lower()
+            props = o.properties_json or {}
+            label_str = (props.get("name", "") or props.get("claim_token", "") or props.get("cdt_code", "") or props.get("patient_hash", "") or "").lower()
+            type_str = (o.object_type or "").lower()
+            key_str = (o.object_key or "").lower()
+            return q in label_str or q in type_str or q in key_str
+
         filtered_objs = [
             o for o in objects
-            if o.object_type in allowed_types and _in_range(o) and _payer_match(o) and _state_match(o)
+            if o.object_type in allowed_types and _in_range(o) and _payer_match(o) and _state_match(o) and _search_match(o)
         ]
 
         if focus_node_id:
@@ -1320,7 +1340,7 @@ class OntologyBuilderV2:
         return {
             "version": "ontology-v2.1",
             "mode": mode,
-            "filters": {"range": range_key, "payer": payer_filter, "state": state_filter, "limit": limit},
+            "filters": {"range": range_key, "payer": payer_filter, "state": state_filter, "search": search, "limit": limit},
             "nodes": nodes,
             "edges": edges,
             "aggregations": {k: len(v) for k, v in procedure_family_aggregation.items()} if procedure_family_aggregation else None,

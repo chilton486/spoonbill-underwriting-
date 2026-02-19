@@ -119,6 +119,8 @@ async def upload_csv(
     db.add(run)
     db.flush()
 
+    import time as _time
+    _t0 = _time.monotonic()
     try:
         summary = ingest_external_claims(
             db=db,
@@ -138,15 +140,25 @@ async def upload_csv(
 
         db.commit()
 
+        _dur = _time.monotonic() - _t0
+        logger.info(
+            "[csv_upload] practice_id=%s run_id=%s duration=%.2fs pulled=%d created=%d updated=%d skipped=%d",
+            practice_id, run.id, _dur, len(external_claims), summary.created, summary.updated, summary.skipped,
+        )
         return CSVUploadResponse(sync_run_id=run.id, summary=summary)
 
     except Exception as e:
         import json
+        _dur = _time.monotonic() - _t0
         run.status = SyncRunStatus.FAILED.value
         run.ended_at = datetime.utcnow()
         run.error_json = json.dumps({"error": str(e)})
         conn.status = IntegrationStatus.ERROR.value
         db.commit()
+        logger.error(
+            "[csv_upload] FAILED practice_id=%s run_id=%s duration=%.2fs error=%s",
+            practice_id, run.id, _dur, str(e),
+        )
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
 
 
@@ -182,6 +194,8 @@ def run_sync(
     db.add(run)
     db.flush()
 
+    import time as _time
+    _t0 = _time.monotonic()
     try:
         claims, next_cursor = provider.fetch_updated_claims(cursor=conn.last_cursor)
         run.pulled_count = len(claims)
@@ -204,23 +218,35 @@ def run_sync(
         conn.status = IntegrationStatus.ACTIVE.value
 
         db.commit()
+        _dur = _time.monotonic() - _t0
+        logger.info(
+            "[api_sync] practice_id=%s run_id=%s duration=%.2fs pulled=%d created=%d updated=%d skipped=%d",
+            practice_id, run.id, _dur, len(claims), summary.created, summary.updated, summary.skipped,
+        )
         return CSVUploadResponse(sync_run_id=run.id, summary=summary)
 
     except OpenDentalNotConfigured as e:
         import json
+        _dur = _time.monotonic() - _t0
         run.status = SyncRunStatus.FAILED.value
         run.ended_at = datetime.utcnow()
         run.error_json = json.dumps({"error": str(e)})
         db.commit()
+        logger.warning("[api_sync] NOT_CONFIGURED practice_id=%s run_id=%s duration=%.2fs", practice_id, run.id, _dur)
         raise HTTPException(status_code=422, detail=str(e))
 
     except Exception as e:
         import json
+        _dur = _time.monotonic() - _t0
         run.status = SyncRunStatus.FAILED.value
         run.ended_at = datetime.utcnow()
         run.error_json = json.dumps({"error": str(e)})
         conn.status = IntegrationStatus.ERROR.value
         db.commit()
+        logger.error(
+            "[api_sync] FAILED practice_id=%s run_id=%s duration=%.2fs error=%s",
+            practice_id, run.id, _dur, str(e),
+        )
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 

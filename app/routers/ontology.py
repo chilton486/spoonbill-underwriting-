@@ -130,6 +130,7 @@ def get_ontology_graph(
     range: str = "90d",
     payer: Optional[str] = None,
     state: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 150,
     focus_node_id: Optional[str] = None,
     hops: int = 2,
@@ -142,8 +143,10 @@ def get_ontology_graph(
             db, practice_id,
             mode=mode, range_key=range, payer_filter=payer,
             state_filter=state, limit=limit,
-            focus_node_id=focus_node_id, hops=hops,
+            focus_node_id=focus_node_id, hops=hops, search=search,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error("ontology graph failed for practice %s: %s", practice_id, e)
         raise HTTPException(status_code=503, detail="Ontology data unavailable — migration may be pending; see /diag")
