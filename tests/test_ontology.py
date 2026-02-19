@@ -457,7 +457,7 @@ class TestGraphExplorer:
         for node in graph["nodes"]:
             assert "id" in node
             assert "type" in node
-            assert "key" in node
+            assert "label" in node
             assert "properties" in node
 
 
@@ -622,3 +622,212 @@ class TestCORSConfig:
         )
         assert resp.status_code == 200
         assert resp.headers.get("access-control-allow-origin") == "http://localhost:5174"
+
+
+class TestCDTFamilyMapping:
+
+    def test_known_preventive_code(self):
+        from app.services.cdt_families import get_cdt_family
+        assert get_cdt_family("D0120") == "Preventive"
+        assert get_cdt_family("D1110") == "Preventive"
+
+    def test_known_restorative_code(self):
+        from app.services.cdt_families import get_cdt_family
+        assert get_cdt_family("D2140") == "Restorative"
+        assert get_cdt_family("D2750") == "Restorative"
+
+    def test_known_endodontics_code(self):
+        from app.services.cdt_families import get_cdt_family
+        assert get_cdt_family("D3310") == "Endodontics"
+
+    def test_known_periodontics_code(self):
+        from app.services.cdt_families import get_cdt_family
+        assert get_cdt_family("D4341") == "Periodontics"
+
+    def test_known_oral_surgery_code(self):
+        from app.services.cdt_families import get_cdt_family
+        assert get_cdt_family("D7140") == "Oral Surgery"
+
+    def test_known_orthodontics_code(self):
+        from app.services.cdt_families import get_cdt_family
+        assert get_cdt_family("D8010") == "Orthodontics"
+
+    def test_unknown_code_returns_other(self):
+        from app.services.cdt_families import get_cdt_family
+        assert get_cdt_family("D9999") == "Other"
+        assert get_cdt_family("XXXXX") == "Other"
+
+    def test_range_fallback(self):
+        from app.services.cdt_families import get_cdt_family
+        result = get_cdt_family("D0199")
+        assert result in ("Preventive", "Other")
+
+    def test_family_counts(self):
+        from app.services.cdt_families import get_family_counts
+        codes = ["D0120", "D0120", "D2140", "D7140", "UNKNOWN"]
+        counts = get_family_counts(codes)
+        assert counts["Preventive"] == 2
+        assert counts["Restorative"] == 1
+        assert counts["Oral Surgery"] == 1
+        assert counts["Other"] == 1
+
+
+class TestPatientRetention:
+
+    def test_retention_schema(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta Dental", amount=50000)
+        _create_claim(db, practice.id, payer="Cigna", amount=30000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        retention = OntologyBuilderV2.get_patient_retention(db, practice.id)
+
+        assert "active_patients_12mo" in retention
+        assert "new_patients" in retention
+        assert "returning_patients" in retention
+        assert "repeat_visit_rate_90d" in retention
+        assert "repeat_visit_rate_180d" in retention
+        assert "reactivation_rate" in retention
+
+    def test_retention_counts_patients(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", amount=50000)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        retention = OntologyBuilderV2.get_patient_retention(db, practice.id)
+
+        assert retention["active_patients_12mo"] >= 1
+
+
+class TestReimbursementMetrics:
+
+    def test_reimbursement_schema(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", amount=50000)
+        _create_claim(db, practice.id, payer="Delta", amount=30000, status=ClaimStatus.DECLINED.value)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        reimb = OntologyBuilderV2.get_reimbursement_metrics(db, practice.id)
+
+        assert "by_payer" in reimb
+        assert "by_procedure_family" in reimb
+        assert "time_to_adjudication" in reimb
+
+    def test_reimbursement_by_payer(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", amount=50000)
+        _create_claim(db, practice.id, payer="Delta", amount=30000, status=ClaimStatus.DECLINED.value)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        reimb = OntologyBuilderV2.get_reimbursement_metrics(db, practice.id)
+
+        assert "Delta" in reimb["by_payer"]
+        delta = reimb["by_payer"]["Delta"]
+        assert "denial_rate" in delta
+        assert "billed_cents" in delta
+
+
+class TestRcmOps:
+
+    def test_rcm_schema(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, amount=50000)
+        _create_claim(db, practice.id, amount=30000, status=ClaimStatus.DECLINED.value)
+        _create_claim(db, practice.id, amount=20000, status=ClaimStatus.PAYMENT_EXCEPTION.value)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        rcm = OntologyBuilderV2.get_rcm_ops(db, practice.id)
+
+        assert "claims_aging_buckets" in rcm
+        assert "exception_rate" in rcm
+        assert "exception_count" in rcm
+        assert "declined_count" in rcm
+        assert "total_claims" in rcm
+
+    def test_rcm_counts(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, amount=50000)
+        _create_claim(db, practice.id, amount=30000, status=ClaimStatus.PAYMENT_EXCEPTION.value)
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        rcm = OntologyBuilderV2.get_rcm_ops(db, practice.id)
+
+        assert rcm["total_claims"] == 2
+        assert rcm["exception_count"] == 1
+
+
+class TestGraphVNext:
+
+    def test_graph_with_mode(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", amount=50000, codes="D0120,D2140")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id, mode="revenue_cycle")
+
+        assert "version" in graph
+        assert "mode" in graph
+        assert graph["mode"] == "revenue_cycle"
+        assert "nodes" in graph
+        assert "edges" in graph
+        assert len(graph["nodes"]) > 0
+
+    def test_graph_nodes_have_labels(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", codes="D0120")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id)
+
+        for node in graph["nodes"]:
+            assert "id" in node
+            assert "type" in node
+            assert "label" in node
+            assert "properties" in node
+
+    def test_graph_edges_have_type_labels(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", codes="D0120")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id)
+
+        for edge in graph["edges"]:
+            assert "from" in edge
+            assert "to" in edge
+            assert "type" in edge
+            assert "type_label" in edge
+
+    def test_graph_patient_retention_mode(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", codes="D0120")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id, mode="patient_retention")
+
+        assert graph["mode"] == "patient_retention"
+        node_types = {n["type"] for n in graph["nodes"]}
+        assert "Patient" in node_types or len(graph["nodes"]) == 0
+
+    def test_graph_density_control(self, db):
+        practice = _create_practice(db)
+        for i in range(10):
+            _create_claim(db, practice.id, payer=f"Payer{i}", amount=10000, codes="D0120,D2140,D3310")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id, limit=50)
+
+        assert len(graph["nodes"]) <= 60
+
+    def test_graph_payer_filter(self, db):
+        practice = _create_practice(db)
+        _create_claim(db, practice.id, payer="Delta", amount=50000, codes="D0120")
+        _create_claim(db, practice.id, payer="Cigna", amount=30000, codes="D2140")
+
+        OntologyBuilderV2.build_practice_ontology(db, practice.id)
+        graph = OntologyBuilderV2.get_graph(db, practice.id, payer_filter="Delta")
+
+        payer_nodes = [n for n in graph["nodes"] if n["type"] == "Payer"]
+        if payer_nodes:
+            payer_names = [n["label"] for n in payer_nodes]
+            assert "Delta" in payer_names

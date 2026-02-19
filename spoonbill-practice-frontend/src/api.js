@@ -286,11 +286,44 @@ export const getOntologyRisks = async (practiceId) => {
   return response.json();
 };
 
-export const getOntologyGraph = async (practiceId) => {
-  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/graph`, {
+export const getOntologyGraph = async (practiceId, params = {}) => {
+  const qp = new URLSearchParams();
+  if (params.mode) qp.append('mode', params.mode);
+  if (params.range) qp.append('range', params.range);
+  if (params.payer) qp.append('payer', params.payer);
+  if (params.state) qp.append('state', params.state);
+  if (params.limit) qp.append('limit', params.limit);
+  if (params.focus_node_id) qp.append('focus_node_id', params.focus_node_id);
+  if (params.hops) qp.append('hops', params.hops);
+  const qs = qp.toString();
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/graph${qs ? `?${qs}` : ''}`, {
     headers: headers(),
   });
   if (!response.ok) throw new Error('Failed to fetch graph');
+  return response.json();
+};
+
+export const getPatientRetention = async (practiceId, range = '90d') => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/retention?range=${range}`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch retention metrics');
+  return response.json();
+};
+
+export const getReimbursementMetrics = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/reimbursement`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch reimbursement metrics');
+  return response.json();
+};
+
+export const getRcmOps = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/rcm`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch RCM ops');
   return response.json();
 };
 
