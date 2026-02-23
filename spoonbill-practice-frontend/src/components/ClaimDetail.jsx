@@ -16,6 +16,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
+import { tokens } from '../theme.js';
 import { getClaim, listDocuments, uploadDocument, getDocumentDownloadUrl, getAuthToken, getPaymentStatus } from '../api';
 
 const statusColors = {
@@ -32,10 +33,10 @@ const statusColors = {
 const LIFECYCLE_STEPS = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED'];
 
 const stepColors = {
-  completed: '#059669',
-  current: '#2563eb',
+  completed: tokens.colors.status.success,
+  current: tokens.colors.accent[600],
   upcoming: '#d1d5db',
-  exception: '#dc2626',
+  exception: tokens.colors.status.error,
 };
 
 const whatHappensNext = {
@@ -301,7 +302,7 @@ function ClaimDetail({ claimId, open, onClose }) {
         {claim.underwriting_decisions && claim.underwriting_decisions.length > 0 ? (
           <List dense>
             {claim.underwriting_decisions.map((decision) => (
-              <ListItem key={decision.id} sx={{ bgcolor: '#f5f5f5', mb: 1, borderRadius: 1 }}>
+              <ListItem key={decision.id} sx={{ bgcolor: tokens.colors.surfaceHover, mb: 1, borderRadius: 1 }}>
                 <ListItemText
                   primary={
                     <Chip
@@ -375,7 +376,7 @@ function ClaimDetail({ claimId, open, onClose }) {
             <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
               Payment Status
             </Typography>
-            <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderRadius: 1 }}>
+            <Box sx={{ bgcolor: tokens.colors.surfaceHover, p: 2, borderRadius: 1 }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <Box>
                   <Typography variant="caption" color="text.secondary">Status</Typography>
@@ -398,7 +399,7 @@ function ClaimDetail({ claimId, open, onClose }) {
                 {payment.provider_reference && (
                   <Box>
                     <Typography variant="caption" color="text.secondary">Reference</Typography>
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>{payment.provider_reference}</Typography>
+                    <Typography sx={{ fontFamily: tokens.typography.mono, fontSize: '0.85rem' }}>{payment.provider_reference}</Typography>
                   </Box>
                 )}
                 {payment.confirmed_at && (
@@ -425,7 +426,7 @@ function ClaimDetail({ claimId, open, onClose }) {
         {claim.audit_events && claim.audit_events.length > 0 ? (
           <List dense>
             {claim.audit_events.map((event) => (
-              <ListItem key={event.id} sx={{ bgcolor: '#f5f5f5', mb: 1, borderRadius: 1 }}>
+              <ListItem key={event.id} sx={{ bgcolor: tokens.colors.surfaceHover, mb: 1, borderRadius: 1 }}>
                 <ListItemText
                   primary={event.action}
                   secondary={

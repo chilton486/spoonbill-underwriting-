@@ -4,6 +4,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
 import { login, getCurrentUser } from '../api';
 
 function LoginPage({ onLogin }) {
@@ -29,9 +30,9 @@ function LoginPage({ onLogin }) {
   };
 
   return (
-    <Paper elevation={0} sx={{ p: 4, border: '1px solid #e0e0e0' }}>
+    <Paper elevation={0} sx={{ p: 4 }}>
       <form onSubmit={handleSubmit}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
             label="Email"
@@ -55,7 +56,8 @@ function LoginPage({ onLogin }) {
             variant="contained"
             disabled={loading}
             fullWidth
-            sx={{ mt: 1 }}
+            size="large"
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>

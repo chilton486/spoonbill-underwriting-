@@ -8,6 +8,7 @@ import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
+import { tokens } from '../theme.js';
 
 import { validateInviteToken, setPassword, API_BASE_URL } from '../api';
 
@@ -73,75 +74,95 @@ export default function SetPasswordPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="sm">
-        <Box sx={{ mt: 8, textAlign: 'center' }}>
-          <CircularProgress />
-          <Typography sx={{ mt: 2 }}>Validating invite link...</Typography>
+      <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+        <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
         </Box>
-      </Container>
+        <Container maxWidth="sm">
+          <Box sx={{ mt: 8, textAlign: 'center' }}>
+            <CircularProgress size={36} />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>Validating invite link...</Typography>
+          </Box>
+        </Container>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="sm">
-        <Box sx={{ mt: 8 }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 600 }}>
-            Spoonbill Practice Portal
-          </Typography>
-          <Paper sx={{ p: 4, mt: 3 }}>
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              If you believe this is a mistake, please contact your Spoonbill representative to request a new invite link.
-            </Typography>
-          </Paper>
+      <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+        <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
         </Box>
-      </Container>
+        <Container maxWidth="sm">
+          <Box sx={{ mt: 8 }}>
+            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 700 }}>
+              Practice Portal
+            </Typography>
+            <Paper sx={{ p: 4, mt: 3 }}>
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                If you believe this is a mistake, please contact your Spoonbill representative to request a new invite link.
+              </Typography>
+            </Paper>
+          </Box>
+        </Container>
+      </Box>
     );
   }
 
   if (success) {
     return (
-      <Container maxWidth="sm">
-        <Box sx={{ mt: 8 }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 600 }}>
-            Spoonbill Practice Portal
-          </Typography>
-          <Paper sx={{ p: 4, mt: 3 }}>
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Password set successfully! You can now log in.
-            </Alert>
-            <Button
-              fullWidth
-              variant="contained"
-              onClick={() => navigate('/')}
-              sx={{ mt: 2 }}
-            >
-              Go to Login
-            </Button>
-          </Paper>
+      <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+        <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
         </Box>
-      </Container>
+        <Container maxWidth="sm">
+          <Box sx={{ mt: 8 }}>
+            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 700 }}>
+              Practice Portal
+            </Typography>
+            <Paper sx={{ p: 4, mt: 3 }}>
+              <Box sx={{ textAlign: 'center', py: 2 }}>
+                <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: tokens.colors.status.successBg, border: `2px solid ${tokens.colors.status.successBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+                  <Typography sx={{ fontSize: 20, color: tokens.colors.status.success }}>\u2713</Typography>
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Password Set Successfully</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>You can now log in to the Practice Portal.</Typography>
+              </Box>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={() => navigate('/')}
+                size="large"
+              >
+                Go to Login
+              </Button>
+            </Paper>
+          </Box>
+        </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 8 }}>
-        {isDev && (
-          <Alert severity="info" sx={{ mb: 2, fontSize: '0.75rem' }}>
-            API: {API_BASE_URL}
-          </Alert>
-        )}
-        <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 600 }}>
-          Spoonbill Practice Portal
-        </Typography>
-        <Paper sx={{ p: 4, mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
+    <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+      <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+      </Box>
+      <Container maxWidth="sm">
+        <Box sx={{ mt: 8 }}>
+          {isDev && (
+            <Alert severity="info" sx={{ mb: 2, fontSize: '0.75rem' }}>
+              API: {API_BASE_URL}
+            </Alert>
+          )}
+          <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 700 }}>
             Set Your Password
           </Typography>
+          <Paper sx={{ p: 4, mt: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Welcome to <strong>{practiceName}</strong>!
           </Typography>
@@ -186,8 +207,9 @@ export default function SetPasswordPage() {
               {submitting ? 'Setting Password...' : 'Set Password'}
             </Button>
           </form>
-        </Paper>
-      </Box>
-    </Container>
+          </Paper>
+        </Box>
+      </Container>
+    </Box>
   );
 }

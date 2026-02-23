@@ -563,4 +563,3 @@ export function createSpoonbillTheme(overrides = {}) {
 }
 
 export const theme = createSpoonbillTheme()
-export const themeTokens = tokens
