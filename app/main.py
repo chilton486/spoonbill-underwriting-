@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router, internal_practices_router, ontology_router, integrations_router, ops_router
@@ -80,9 +80,18 @@ def health_check(db: Session = Depends(get_db)):
 
 
 @app.get("/diag")
-def diagnostics():
+def diagnostics(db: Session = Depends(get_db)):
     """Runtime diagnostics endpoint (no secrets exposed)."""
     state = get_migration_state(engine)
+
+    control_tower_last_computed_at = None
+    try:
+        from .models.ledger import LedgerEntry
+        last_entry = db.query(func.max(LedgerEntry.created_at)).scalar()
+        if last_entry:
+            control_tower_last_computed_at = last_entry.isoformat()
+    except Exception:
+        pass
 
     return {
         "ok": True,
@@ -95,4 +104,6 @@ def diagnostics():
         "head_revision": state["head_revision"],
         "migration_pending": state["migration_pending"],
         "run_migrations_on_startup_enabled": settings.run_migrations_on_startup.lower() == "true",
+        "last_migration_run_at": state.get("last_migration_run_at"),
+        "control_tower_last_computed_at": control_tower_last_computed_at,
     }

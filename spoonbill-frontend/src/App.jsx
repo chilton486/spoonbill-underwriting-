@@ -27,6 +27,9 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import ExtensionIcon from '@mui/icons-material/Extension'
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows'
+import AssignmentIcon from '@mui/icons-material/Assignment'
 
 import { theme, themeTokens as tokens } from './theme.js'
 
@@ -48,10 +51,15 @@ import PaymentExceptions from './components/PaymentExceptions.jsx'
 import EconomicsTab from './components/EconomicsTab.jsx'
 import PracticeRecord from './components/PracticeRecord.jsx'
 import AgenticOpsPanel from './components/AgenticOpsPanel.jsx'
+import ControlTowerPage from './components/ControlTowerPage.jsx'
+import ReconciliationPage from './components/ReconciliationPage.jsx'
+import TasksQueue from './components/TasksQueue.jsx'
 
 const STATUSES = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED', 'PAYMENT_EXCEPTION']
 
 const NAV_SECTIONS = [
+  { key: 'control-tower', label: 'Control Tower', icon: AccountBalanceIcon },
+  { divider: true },
   { key: 'claims', label: 'Claims', icon: DescriptionIcon },
   { key: 'applications', label: 'Applications', icon: InboxIcon },
   { key: 'practices', label: 'Practices', icon: BusinessIcon },
@@ -60,6 +68,8 @@ const NAV_SECTIONS = [
   { key: 'exceptions', label: 'Exceptions', icon: WarningAmberIcon },
   { divider: true },
   { key: 'economics', label: 'Economics', icon: ShowChartIcon },
+  { key: 'reconciliation', label: 'Reconciliation', icon: CompareArrowsIcon },
+  { key: 'tasks', label: 'Tasks', icon: AssignmentIcon },
   { key: 'agentic', label: 'Agentic Ops', icon: SmartToyIcon },
 ]
 
@@ -74,7 +84,7 @@ export default function App() {
   const [detailOpen, setDetailOpen] = React.useState(false)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState(0)
-  const [navSection, setNavSection] = React.useState('claims')
+  const [navSection, setNavSection] = React.useState('control-tower')
   const [loadingClaimId, setLoadingClaimId] = React.useState(null)
   const [claimSearchInput, setClaimSearchInput] = React.useState('')
   const [claimSearchQuery, setClaimSearchQuery] = React.useState('')
@@ -281,7 +291,7 @@ export default function App() {
           <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, px: 3, py: 1.5 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="h5" sx={{ fontWeight: 700, textTransform: 'capitalize' }}>
-                {navSection === 'agentic' ? 'Agentic Ops' : navSection}
+                {navSection === 'agentic' ? 'Agentic Ops' : navSection === 'control-tower' ? 'Control Tower' : navSection}
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Chip
@@ -377,7 +387,10 @@ export default function App() {
 
               {navSection === 'exceptions' && <PaymentExceptions />}
               {navSection === 'economics' && <EconomicsTab />}
+              {navSection === 'reconciliation' && <ReconciliationPage />}
+              {navSection === 'tasks' && <TasksQueue />}
               {navSection === 'agentic' && <AgenticOpsPanel />}
+              {navSection === 'control-tower' && <ControlTowerPage />}
             </Stack>
           </Box>
         </Box>

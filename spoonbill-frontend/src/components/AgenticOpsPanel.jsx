@@ -13,14 +13,28 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Skeleton from '@mui/material/Skeleton'
 import Tooltip from '@mui/material/Tooltip'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import Divider from '@mui/material/Divider'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
+import FlashOnIcon from '@mui/icons-material/FlashOn'
+import ScienceIcon from '@mui/icons-material/Science'
 import { tokens } from '../theme.js'
 
 import {
   generateActionProposals,
   executeActionProposal,
+  simulateActionProposal,
 } from '../api.js'
+
+const AUTOPILOT_LEVELS = [
+  { value: 'OFF', label: 'Off', icon: VisibilityIcon, desc: 'Insights only' },
+  { value: 'L1', label: 'Level 1', icon: PlaylistAddCheckIcon, desc: 'Auto-create tasks' },
+  { value: 'L2', label: 'Level 2', icon: FlashOnIcon, desc: 'Auto-execute low-risk' },
+]
 
 function fmt(cents) {
   if (cents == null) return '$0.00'
@@ -56,8 +70,23 @@ const ACTION_LABELS = {
   FLAG_CONCENTRATION: 'Flag Concentration Risk',
 }
 
-function ProposalCard({ proposal, onApply, index }) {
+function ProposalCard({ proposal, onApply, onSimulate, index }) {
   const [expanded, setExpanded] = React.useState(false)
+  const [simResult, setSimResult] = React.useState(null)
+  const [simLoading, setSimLoading] = React.useState(false)
+
+  const handleSimulate = async () => {
+    setSimLoading(true)
+    try {
+      const result = await onSimulate(proposal)
+      setSimResult(result)
+      setExpanded(true)
+    } catch (e) {
+      setSimResult({ error: e.message })
+    } finally {
+      setSimLoading(false)
+    }
+  }
 
   return (
     <Paper sx={{ p: 2.5 }}>
@@ -104,9 +133,14 @@ function ProposalCard({ proposal, onApply, index }) {
           </Stack>
         )}
 
-        <Button size="small" variant="text" onClick={() => setExpanded(!expanded)} sx={{ alignSelf: 'flex-start' }}>
-          {expanded ? 'Hide Metrics' : 'Show Metrics'}
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button size="small" variant="text" onClick={() => setExpanded(!expanded)} sx={{ alignSelf: 'flex-start' }}>
+            {expanded ? 'Hide Details' : 'Show Metrics'}
+          </Button>
+          <Button size="small" variant="outlined" startIcon={simLoading ? <CircularProgress size={14} /> : <ScienceIcon />} onClick={handleSimulate} disabled={simLoading}>
+            Simulate
+          </Button>
+        </Stack>
 
         {expanded && proposal.supporting_metrics && (
           <Paper variant="outlined" sx={{ p: 1.5, bgcolor: tokens.colors.surfaceHover }}>
@@ -121,6 +155,62 @@ function ProposalCard({ proposal, onApply, index }) {
               ))}
             </Stack>
           </Paper>
+        )}
+
+        {simResult && !simResult.error && (
+          <Paper variant="outlined" sx={{ p: 1.5, borderColor: tokens.colors.accent[200], bgcolor: tokens.colors.accent[50] + '33' }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: tokens.colors.accent[700] }}>Simulation Result</Typography>
+            <Stack spacing={1} sx={{ mt: 1 }}>
+              <Stack direction="row" spacing={3}>
+                <Box>
+                  <Typography variant="caption">Risk</Typography>
+                  <Chip
+                    label={simResult.risk_assessment}
+                    size="small"
+                    color={simResult.risk_assessment === 'high' ? 'error' : simResult.risk_assessment === 'medium' ? 'warning' : 'success'}
+                    sx={{ ml: 0.5 }}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="caption">Liquidity Impact</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: tokens.typography.mono }}>
+                    {fmt(simResult.expected_impact?.liquidity_delta_cents)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption">Exposure Impact</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: tokens.typography.mono }}>
+                    {fmt(simResult.expected_impact?.exposure_delta_cents)}
+                  </Typography>
+                </Box>
+              </Stack>
+              {(simResult.policy_checks_passed || []).length > 0 && (
+                <Stack spacing={0.25}>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Policy Checks</Typography>
+                  {simResult.policy_checks_passed.map((pc, i) => (
+                    <Stack key={i} direction="row" spacing={0.5} alignItems="center">
+                      <Chip
+                        label={pc.passed ? 'PASS' : 'FAIL'}
+                        size="small"
+                        color={pc.passed ? 'success' : 'error'}
+                        sx={{ height: 18, fontSize: '0.6rem', minWidth: 40 }}
+                      />
+                      <Typography variant="caption">{pc.name.replace(/_/g, ' ')}</Typography>
+                      <Typography variant="caption" color="text.secondary">— {pc.detail}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+              {(simResult.required_approvals || []).length > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  Approvals: {simResult.required_approvals.join(', ')}
+                </Typography>
+              )}
+            </Stack>
+          </Paper>
+        )}
+        {simResult?.error && (
+          <Alert severity="error" sx={{ py: 0.25 }}>{simResult.error}</Alert>
         )}
 
         <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -140,6 +230,7 @@ export default function AgenticOpsPanel({ practiceId }) {
   const [success, setSuccess] = React.useState(null)
   const [confirmDialog, setConfirmDialog] = React.useState(null)
   const [executing, setExecuting] = React.useState(false)
+  const [autopilotLevel, setAutopilotLevel] = React.useState('OFF')
 
   const handleGenerate = async () => {
     setLoading(true)
@@ -160,6 +251,10 @@ export default function AgenticOpsPanel({ practiceId }) {
 
   const handleApply = (proposal) => {
     setConfirmDialog(proposal)
+  }
+
+  const handleSimulate = async (proposal) => {
+    return await simulateActionProposal(proposal)
   }
 
   const handleConfirmExecute = async () => {
@@ -195,8 +290,34 @@ export default function AgenticOpsPanel({ practiceId }) {
         </Button>
       </Stack>
 
+      <Paper variant="outlined" sx={{ p: 2, bgcolor: tokens.colors.surfaceHover }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Autopilot Level</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {AUTOPILOT_LEVELS.find(l => l.value === autopilotLevel)?.desc}
+            </Typography>
+          </Stack>
+          <ToggleButtonGroup
+            value={autopilotLevel}
+            exclusive
+            onChange={(e, val) => { if (val) setAutopilotLevel(val) }}
+            size="small"
+          >
+            {AUTOPILOT_LEVELS.map(l => (
+              <ToggleButton key={l.value} value={l.value} sx={{ textTransform: 'none', px: 2 }}>
+                <l.icon sx={{ fontSize: 16, mr: 0.5 }} />
+                {l.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Stack>
+      </Paper>
+
       <Alert severity="info" sx={{ py: 0.5 }} icon={<WarningAmberIcon fontSize="small" />}>
-        Recommendations are generated by a deterministic rules engine. Applying an action requires explicit confirmation and writes an audit event. No action is taken without human approval.
+        {autopilotLevel === 'OFF' && 'Insights only mode. Recommendations require manual review and approval.'}
+        {autopilotLevel === 'L1' && 'Level 1: System will auto-create tasks from recommendations. Execution still requires approval.'}
+        {autopilotLevel === 'L2' && 'Level 2: Low-risk actions (with hard caps) will auto-execute. High-risk actions still need approval.'}
       </Alert>
 
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
@@ -235,7 +356,7 @@ export default function AgenticOpsPanel({ practiceId }) {
       )}
 
       {proposals.map((p, i) => (
-        <ProposalCard key={p.action + '-' + (p.practice_id || '') + '-' + i} proposal={p} onApply={handleApply} index={i} />
+        <ProposalCard key={p.action + '-' + (p.practice_id || '') + '-' + i} proposal={p} onApply={handleApply} onSimulate={handleSimulate} index={i} />
       ))}
 
       <Dialog open={!!confirmDialog} onClose={() => setConfirmDialog(null)} maxWidth="sm" fullWidth>

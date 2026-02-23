@@ -10,6 +10,7 @@ from .practice_application import PracticeApplication, ApplicationStatus, Practi
 from .invite import PracticeManagerInvite
 from .ontology import OntologyObject, OntologyObjectType, OntologyLink, OntologyLinkType, KPIObservation
 from .integration import IntegrationConnection, IntegrationSyncRun, IntegrationProvider, IntegrationStatus, SyncRunStatus
+from .ops import OpsTask, TaskStatus, PlaybookType, ExternalBalanceSnapshot, ExternalPaymentConfirmation
 
 __all__ = [
     "User",

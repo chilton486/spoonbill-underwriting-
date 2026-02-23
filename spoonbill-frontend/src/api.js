@@ -268,6 +268,71 @@ export async function validateActionProposal(proposal) {
   })
 }
 
+export async function simulateActionProposal(proposal) {
+  return request('/ops/action-proposals/simulate', {
+    method: 'POST',
+    body: JSON.stringify(proposal),
+  })
+}
+
+export async function getControlTower(currency = 'USD') {
+  return request(`/ops/economics/control-tower?currency=${encodeURIComponent(currency)}`)
+}
+
+export async function getReconciliationSummary() {
+  return request('/ops/reconciliation/summary')
+}
+
+export async function getReconciliationPaymentIntents(params = {}) {
+  const qs = new URLSearchParams()
+  if (params.status) qs.append('status', params.status)
+  if (params.limit) qs.append('limit', params.limit)
+  const queryString = qs.toString()
+  return request(`/ops/reconciliation/payment-intents${queryString ? '?' + queryString : ''}`)
+}
+
+export async function ingestReconciliationData(payload) {
+  return request('/ops/reconciliation/ingest', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function resolveReconciliationMismatch(payload) {
+  return request('/ops/reconciliation/resolve', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getOpsTasks(params = {}) {
+  const qs = new URLSearchParams()
+  if (params.status) qs.append('status', params.status)
+  if (params.practice_id) qs.append('practice_id', params.practice_id)
+  if (params.limit) qs.append('limit', params.limit)
+  if (params.offset) qs.append('offset', params.offset)
+  const queryString = qs.toString()
+  return request(`/ops/tasks${queryString ? '?' + queryString : ''}`)
+}
+
+export async function updateOpsTask(taskId, payload) {
+  return request(`/ops/tasks/${taskId}/update`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function runPlaybook(payload) {
+  return request('/ops/playbooks/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getPlaybookTemplates() {
+  return request('/ops/playbooks/templates')
+}
+
 // Search API
 export async function searchClaims(query, status = null, practiceId = null) {
   const params = new URLSearchParams()

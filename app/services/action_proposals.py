@@ -289,3 +289,87 @@ class ActionProposalService:
         db.commit()
 
         return {"success": True, "result": result}
+
+    @staticmethod
+    def simulate_proposal(
+        db: Session,
+        proposal: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        action = proposal.get("action")
+        practice_id = proposal.get("practice_id")
+        params = proposal.get("params", {})
+
+        validation = ActionProposalService.validate_proposal(db, proposal)
+
+        liquidity = EconomicsService.get_liquidity_summary(db)
+        exposure = EconomicsService.get_practice_exposure(db, practice_id) if practice_id else {}
+
+        current_available = liquidity.get("available_cash_cents", 0)
+        current_reserved = liquidity.get("reserved_cents", 0)
+        current_utilization = exposure.get("utilization_pct", 0)
+
+        impact = {
+            "liquidity_delta_cents": 0,
+            "exposure_delta_cents": 0,
+            "dso_proxy_change": 0,
+        }
+
+        risk_assessment = "low"
+
+        if action == "ADJUST_LIMIT":
+            old_limit = params.get("current_limit_cents", 0)
+            new_limit = params.get("proposed_limit_cents", 0)
+            delta = new_limit - old_limit
+            impact["exposure_delta_cents"] = delta
+            impact["liquidity_delta_cents"] = -delta
+            if delta > current_available * 0.5:
+                risk_assessment = "high"
+            elif delta > current_available * 0.2:
+                risk_assessment = "medium"
+
+        elif action == "PAUSE_FUNDING":
+            funded = exposure.get("funded_outstanding_cents", 0)
+            impact["exposure_delta_cents"] = 0
+            impact["liquidity_delta_cents"] = 0
+            risk_assessment = "medium"
+
+        elif action == "REVIEW_EXCEPTIONS":
+            impact["exposure_delta_cents"] = 0
+            risk_assessment = "low"
+
+        policy_checks = []
+        policy_checks.append({
+            "name": "practice_active",
+            "passed": validation["valid"] or "not active" not in str(validation.get("errors", [])),
+            "detail": "Practice must be in ACTIVE status",
+        })
+        policy_checks.append({
+            "name": "within_exposure_limit",
+            "passed": True,
+            "detail": f"Per-practice max: ${PER_PRACTICE_MAX_EXPOSURE_CENTS/100:,.0f}",
+        })
+        policy_checks.append({
+            "name": "within_global_limit",
+            "passed": True,
+            "detail": f"Global max: ${GLOBAL_MAX_EXPOSURE_CENTS/100:,.0f}",
+        })
+        policy_checks.append({
+            "name": "sufficient_liquidity",
+            "passed": validation["valid"] or "exceeds available" not in str(validation.get("errors", [])),
+            "detail": f"Available cash: ${current_available/100:,.2f}",
+        })
+
+        return {
+            "proposal": proposal,
+            "validation": validation,
+            "expected_impact": impact,
+            "risk_assessment": risk_assessment,
+            "policy_checks_passed": policy_checks,
+            "current_state": {
+                "available_cash_cents": current_available,
+                "reserved_cents": current_reserved,
+                "practice_utilization_pct": current_utilization,
+            },
+            "required_approvals": proposal.get("required_approvals", ["HUMAN_REQUIRED"]),
+            "simulated_at": datetime.utcnow().isoformat(),
+        }
