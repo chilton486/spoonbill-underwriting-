@@ -8,6 +8,10 @@ import Chip from '@mui/material/Chip';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import Skeleton from '@mui/material/Skeleton';
+import CircularProgress from '@mui/material/CircularProgress';
+import { tokens } from './theme.js';
 
 import LoginPage from './components/LoginPage';
 import ClaimsList from './components/ClaimsList';
@@ -44,13 +48,17 @@ const statusColors = {
 };
 
 function DashboardSummary({ dashboard, onStatusClick, onClaimSelect }) {
-  if (!dashboard) return null;
+  if (!dashboard) return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 2 }}>
+      {[1,2,3,4].map(i => <Skeleton key={i} variant="rounded" height={80} />)}
+    </Box>
+  );
 
   const { status_counts, action_required, recent_claims } = dashboard;
 
   return (
     <Box sx={{ mb: 3 }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 1.5, mb: 3 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 2, mb: 3 }}>
         {STATUS_ORDER.map((s) => {
           const count = status_counts[s] || 0;
           if (s === 'PAYMENT_EXCEPTION' && count === 0) return null;
@@ -59,18 +67,18 @@ function DashboardSummary({ dashboard, onStatusClick, onClaimSelect }) {
               key={s}
               elevation={0}
               sx={{
-                p: 2,
+                p: 2.5,
                 textAlign: 'center',
-                border: '1px solid #e5e7eb',
                 cursor: 'pointer',
-                '&:hover': { borderColor: statusColors[s], bgcolor: '#fafafa' },
+                transition: 'all 0.2s',
+                '&:hover': { borderColor: statusColors[s], boxShadow: tokens.shadow.md, transform: 'translateY(-1px)' },
               }}
               onClick={() => onStatusClick(s)}
             >
-              <Typography variant="h5" sx={{ fontWeight: 700, color: statusColors[s] }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: statusColors[s], mb: 0.5 }}>
                 {count}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
                 {statusLabels[s]}
               </Typography>
             </Paper>
@@ -79,17 +87,17 @@ function DashboardSummary({ dashboard, onStatusClick, onClaimSelect }) {
       </Box>
 
       {action_required.length > 0 && (
-        <Paper elevation={0} sx={{ p: 2, mb: 2, border: '1px solid #fbbf24', bgcolor: '#fffbeb' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#92400e' }}>
+        <Paper elevation={0} sx={{ p: 2.5, mb: 2, border: `1px solid ${tokens.colors.status.warningBorder}`, bgcolor: tokens.colors.status.warningBg }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#92400e' }}>
             Action Required ({action_required.length})
           </Typography>
           {action_required.slice(0, 5).map((c) => (
             <Box
               key={c.id}
-              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, cursor: 'pointer', '&:hover': { bgcolor: '#fef3c7' }, px: 1, borderRadius: 1 }}
+              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.75, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(0,0,0,0.03)' }, px: 1.5, borderRadius: 1, transition: 'background 0.15s' }}
               onClick={() => onClaimSelect(c)}
             >
-              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{c.claim_token}</Typography>
+              <Typography variant="body2" sx={{ fontFamily: tokens.typography.mono, fontWeight: 500, fontSize: '0.8rem' }}>{c.claim_token}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" color="text.secondary">{c.payer}</Typography>
                 <Chip label={c.status === 'PAYMENT_EXCEPTION' ? 'Funding Delayed' : c.status.replace('_', ' ')} size="small" color="warning" />
@@ -100,8 +108,8 @@ function DashboardSummary({ dashboard, onStatusClick, onClaimSelect }) {
       )}
 
       {recent_claims.length > 0 && (
-        <Paper elevation={0} sx={{ p: 2, border: '1px solid #e5e7eb' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+        <Paper elevation={0} sx={{ p: 2.5 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
             Recent Claims
           </Typography>
           {recent_claims.map((c) => (
@@ -112,27 +120,29 @@ function DashboardSummary({ dashboard, onStatusClick, onClaimSelect }) {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 py: 1,
-                px: 1,
+                px: 1.5,
                 cursor: 'pointer',
-                '&:hover': { bgcolor: '#f9fafb' },
-                borderBottom: '1px solid #f3f4f6',
+                '&:hover': { bgcolor: tokens.colors.surfaceHover },
+                borderBottom: `1px solid ${tokens.colors.border.light}`,
+                transition: 'background 0.15s',
+                borderRadius: 1,
               }}
               onClick={() => onClaimSelect(c)}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ fontFamily: tokens.typography.mono, fontWeight: 600, fontSize: '0.8rem' }}>
                   {c.claim_token}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">{c.payer}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant="body2">
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
                   {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(c.amount_cents / 100)}
                 </Typography>
                 <Chip
                   label={c.status === 'PAYMENT_EXCEPTION' ? 'Funding Delayed' : c.status.replace('_', ' ')}
                   size="small"
-                  sx={{ bgcolor: (statusColors[c.status] || '#6b7280') + '20', color: statusColors[c.status] || '#6b7280', fontWeight: 600, fontSize: '0.7rem' }}
+                  sx={{ bgcolor: (statusColors[c.status] || '#6b7280') + '15', color: statusColors[c.status] || '#6b7280', fontWeight: 600, fontSize: '0.7rem' }}
                 />
               </Box>
             </Box>
@@ -247,59 +257,75 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Typography>Loading...</Typography>
+      <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={36} />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>Loading portal...</Typography>
         </Box>
-      </Container>
+      </Box>
     );
   }
 
   if (!user) {
     return (
-      <Container maxWidth="sm">
-        <Box sx={{ mt: 8 }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 600 }}>
-            Spoonbill Practice Portal
-          </Typography>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <LoginPage onLogin={handleLogin} />
+      <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+        <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
         </Box>
-      </Container>
+        <Container maxWidth="sm">
+          <Box sx={{ mt: 8 }}>
+            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 700 }}>
+              Practice Portal
+            </Typography>
+            <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
+              Sign in to manage your practice claims and payments.
+            </Typography>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+            <LoginPage onLogin={handleLogin} />
+          </Box>
+        </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-            Practice Portal
-          </Typography>
+    <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+      <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, px: 3, py: 1.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: 1200, mx: 'auto' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+            <Chip label="Practice Portal" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[700], fontWeight: 600, fontSize: '0.7rem' }} />
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Chip
               label="Practice Manager"
               size="small"
-              sx={{ bgcolor: '#e5e7eb', color: '#374151', fontWeight: 600 }}
+              sx={{ bgcolor: tokens.colors.surfaceHover, color: tokens.colors.text.secondary, fontWeight: 600, fontSize: '0.7rem' }}
             />
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="caption" color="text.secondary">
               {user.email}
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+            <Button variant="outlined" size="small" onClick={() => setSubmitDialogOpen(true)}>
+              + Submit Claim
+            </Button>
+            <Button
+              variant="text"
+              size="small"
+              sx={{ color: tokens.colors.text.muted }}
               onClick={handleLogout}
             >
               Logout
-            </Typography>
+            </Button>
           </Box>
         </Box>
+      </Box>
 
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', px: 3, py: 3 }}>
+        <Paper sx={{ px: 0.5, py: 0, mb: 3 }}>
           <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
             <Tab label="Dashboard" />
             <Tab label="Claims" />
@@ -307,7 +333,7 @@ function Dashboard() {
             <Tab label="Ontology" />
             <Tab label="Integrations" />
           </Tabs>
-        </Box>
+        </Paper>
 
         {activeTab === 0 && (
           <DashboardSummary
@@ -356,7 +382,7 @@ function Dashboard() {
           onSubmitted={handleClaimSubmitted}
         />
       </Box>
-    </Container>
+    </Box>
   );
 }
 

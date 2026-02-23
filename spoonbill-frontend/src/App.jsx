@@ -9,10 +9,12 @@ import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
+import Paper from '@mui/material/Paper'
+import Skeleton from '@mui/material/Skeleton'
 import { ThemeProvider } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 
-import { theme } from './theme.js'
+import { theme, themeTokens as tokens } from './theme.js'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import SearchIcon from '@mui/icons-material/Search'
@@ -147,10 +149,12 @@ export default function App() {
       return (
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
-            <CircularProgress />
-            <Typography sx={{ mt: 2 }}>Loading...</Typography>
-          </Container>
+          <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Stack spacing={2} alignItems="center">
+              <CircularProgress size={36} />
+              <Typography variant="body2" color="text.secondary">Loading console...</Typography>
+            </Stack>
+          </Box>
         </ThemeProvider>
       )
     }
@@ -159,7 +163,9 @@ export default function App() {
       return (
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <LoginPage onLogin={handleLogin} />
+          <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+            <LoginPage onLogin={handleLogin} />
+          </Box>
         </ThemeProvider>
       )
     }
@@ -167,122 +173,118 @@ export default function App() {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Stack spacing={3}>
-          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <Stack spacing={0.5}>
-              <Typography variant="h4" sx={{ fontWeight: 900 }}>Spoonbill Internal Console</Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Claim lifecycle management with audit trail
-              </Typography>
+        <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+          <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, px: 3, py: 1.5 }}>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', maxWidth: 1400, mx: 'auto' }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+                <Chip label="Internal Console" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[700], fontWeight: 600, fontSize: '0.7rem' }} />
+              </Stack>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Chip
+                  label={user.role === 'ADMIN' ? 'Admin' : 'Ops'}
+                  size="small"
+                  sx={{ bgcolor: tokens.colors.text.primary, color: '#fff', fontWeight: 600, fontSize: '0.7rem' }}
+                />
+                <Typography variant="caption" color="text.secondary">{user.email}</Typography>
+                <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
+                  + New Claim
+                </Button>
+                <Button variant="text" size="small" onClick={handleLogout} sx={{ color: tokens.colors.text.muted }}>
+                  Logout
+                </Button>
+              </Stack>
             </Stack>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Chip 
-                label={user.role === 'ADMIN' ? 'Admin' : 'Ops'} 
-                size="small" 
-                sx={{ bgcolor: '#1a1a1a', color: '#ffffff', fontWeight: 600 }}
-              />
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {user.email}
-              </Typography>
-              <Button variant="outlined" onClick={() => setCreateOpen(true)}>
-                Create Claim
-              </Button>
-              <Button variant="outlined" color="inherit" onClick={handleLogout}>
-                Logout
-              </Button>
-            </Stack>
-          </Stack>
+          </Box>
 
-                    {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+          <Box sx={{ maxWidth: 1400, mx: 'auto', px: 3, py: 3 }}>
+            <Stack spacing={3}>
+              {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                      <Tabs value={mainTab} onChange={(e, v) => setMainTab(v)}>
-                        {MAIN_TABS.map((tab) => (
-                          <Tab key={tab} label={tab} />
+              <Paper sx={{ px: 0.5, py: 0 }}>
+                <Tabs value={mainTab} onChange={(e, v) => setMainTab(v)}>
+                  {MAIN_TABS.map((tab) => (
+                    <Tab key={tab} label={tab} />
+                  ))}
+                </Tabs>
+              </Paper>
+
+              {mainTab === 0 && (
+                <>
+                  <Stack direction="row" justifyContent="flex-end" alignItems="center">
+                    <TextField
+                      size="small"
+                      placeholder="Search claims..."
+                      value={claimSearchInput}
+                      onChange={(e) => setClaimSearchInput(e.target.value)}
+                      sx={{ width: 360 }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Stack>
+
+                  {!claimSearchQuery && (
+                    <Paper sx={{ px: 0.5, py: 0 }}>
+                      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
+                        {STATUSES.map((status) => (
+                          <Tab
+                            key={status}
+                            label={
+                              <Stack direction="row" spacing={0.75} alignItems="center">
+                                <span>{status.replace(/_/g, ' ')}</span>
+                                <Chip label={claimCounts[status]} size="small" sx={{ height: 20, fontSize: '0.7rem', minWidth: 24 }} />
+                              </Stack>
+                            }
+                          />
                         ))}
                       </Tabs>
-                    </Box>
+                    </Paper>
+                  )}
 
-                    {mainTab === 0 && (
-                      <>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                          <Box sx={{ flex: 1 }} />
-                          <TextField
-                            size="small"
-                            placeholder="Search claims by ID, token, patient, payer, practice..."
-                            value={claimSearchInput}
-                            onChange={(e) => setClaimSearchInput(e.target.value)}
-                            sx={{ width: 400 }}
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <SearchIcon sx={{ color: 'text.secondary' }} />
-                                </InputAdornment>
-                              ),
-                            }}
-                          />
-                        </Stack>
+                  {claimSearchQuery && (
+                    <Alert severity="info">
+                      Showing {claims.length} result(s) for &ldquo;{claimSearchQuery}&rdquo;
+                      <Button size="small" sx={{ ml: 2 }} onClick={() => { setClaimSearchInput(''); setClaimSearchQuery(''); }}>
+                        Clear
+                      </Button>
+                    </Alert>
+                  )}
 
-                        {!claimSearchQuery && (
-                          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                            <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
-                              {STATUSES.map((status) => (
-                                <Tab 
-                                  key={status} 
-                                  label={`${status.replace('_', ' ')} (${claimCounts[status]})`}
-                                />
-                              ))}
-                            </Tabs>
-                          </Box>
-                        )}
+                  <ClaimsList
+                    claims={claimSearchQuery ? claims : filteredClaims}
+                    onOpenClaim={openClaimDetail}
+                    loadingClaimId={loadingClaimId}
+                  />
+                </>
+              )}
 
-                        {claimSearchQuery && (
-                          <Alert severity="info" sx={{ mb: 2 }}>
-                            Showing {claims.length} result(s) for "{claimSearchQuery}"
-                            <Button size="small" sx={{ ml: 2 }} onClick={() => { setClaimSearchInput(''); setClaimSearchQuery(''); }}>
-                              Clear search
-                            </Button>
-                          </Alert>
-                        )}
+              {mainTab === 1 && <ApplicationsQueue />}
+              {mainTab === 2 && <PracticesList />}
+              {mainTab === 3 && <PaymentExceptions />}
+            </Stack>
+          </Box>
 
-                        <ClaimsList
-                          claims={claimSearchQuery ? claims : filteredClaims}
-                          onOpenClaim={openClaimDetail}
-                          loadingClaimId={loadingClaimId}
-                        />
-                      </>
-                    )}
+          <ClaimDetailDialog
+            open={detailOpen}
+            onClose={() => setDetailOpen(false)}
+            claim={selectedClaim}
+            onRefresh={refresh}
+          />
 
-                    {mainTab === 1 && (
-                      <ApplicationsQueue />
-                    )}
-
-                    {mainTab === 2 && (
-                      <PracticesList />
-                    )}
-
-                    {mainTab === 3 && (
-                      <PaymentExceptions />
-                    )}
-        </Stack>
-
-        <ClaimDetailDialog
-          open={detailOpen}
-          onClose={() => setDetailOpen(false)}
-          claim={selectedClaim}
-          onRefresh={refresh}
-        />
-
-        <CreateClaimDialog
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
-          onCreated={() => {
-            setCreateOpen(false)
-            refresh()
-          }}
-        />
-      </Container>
-    </ThemeProvider>
-  )
+          <CreateClaimDialog
+            open={createOpen}
+            onClose={() => setCreateOpen(false)}
+            onCreated={() => {
+              setCreateOpen(false)
+              refresh()
+            }}
+          />
+        </Box>
+      </ThemeProvider>
+    )
 }

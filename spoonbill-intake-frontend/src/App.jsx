@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
@@ -17,17 +17,9 @@ import Checkbox from '@mui/material/Checkbox';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: '#000000' },
-    secondary: { main: '#666666' },
-    background: { default: '#ffffff', paper: '#f5f5f5' },
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-});
+import { createSpoonbillTheme, tokens } from './theme.js';
+
+const theme = createSpoonbillTheme();
 
 // API base URL - read from environment variable, fallback to localhost for local dev
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -386,15 +378,21 @@ function ContactStep({ formData, setFormData, errors }) {
 
 function SuccessScreen({ applicationId, email }) {
   return (
-    <Box sx={{ textAlign: 'center', py: 4 }}>
-      <Typography variant="h4" gutterBottom>Application Submitted</Typography>
-      <Typography variant="body1" paragraph>
-        Thank you for applying to Spoonbill. Your application ID is:
+    <Box sx={{ textAlign: 'center', py: 6 }}>
+      <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: tokens.colors.status.successBg, border: `2px solid ${tokens.colors.status.successBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
+        <Typography sx={{ fontSize: 28, color: tokens.colors.status.success }}>✓</Typography>
+      </Box>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>Application Submitted</Typography>
+      <Typography variant="body1" color="text.secondary" paragraph>
+        Thank you for applying to Spoonbill.
       </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 'bold', my: 2 }}>
-        #{applicationId}
-      </Typography>
-      <Typography variant="body1" paragraph>
+      <Box sx={{ display: 'inline-block', bgcolor: tokens.colors.accent[50], border: `1px solid ${tokens.colors.accent[200]}`, borderRadius: 2, px: 3, py: 1.5, my: 2 }}>
+        <Typography variant="caption" color="text.secondary">Application ID</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>
+          #{applicationId}
+        </Typography>
+      </Box>
+      <Typography variant="body1" paragraph sx={{ mt: 2 }}>
         Our team will review your application and contact you at <strong>{email}</strong> within 2-3 business days.
       </Typography>
       <Typography variant="body2" color="text.secondary">
@@ -702,11 +700,16 @@ function ApplicationForm() {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Container maxWidth="md" sx={{ py: 4 }}>
-          <Paper sx={{ p: 4 }}>
-            <SuccessScreen applicationId={applicationId} email={formData.contact_email} />
-          </Paper>
-        </Container>
+        <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+          <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3, mb: 4 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+          </Box>
+          <Container maxWidth="sm" sx={{ py: 4 }}>
+            <Paper sx={{ p: 5, borderRadius: 3 }}>
+              <SuccessScreen applicationId={applicationId} email={formData.contact_email} />
+            </Paper>
+          </Container>
+        </Box>
       </ThemeProvider>
     );
   }
@@ -714,57 +717,79 @@ function ApplicationForm() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h4" align="center" gutterBottom>
-            Apply for Spoonbill
-          </Typography>
-          <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 4 }}>
-            Complete this form to apply for Spoonbill dental claims financing.
-            Our team will review your application and contact you within 2-3 business days.
-          </Typography>
-          
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-          
-          {submitError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {submitError}
-            </Alert>
-          )}
-          
-          {getStepContent(activeStep)}
-          
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-            <Button
-              disabled={activeStep === 0}
-              onClick={handleBack}
-              variant="outlined"
-            >
-              Back
-            </Button>
-            {activeStep === steps.length - 1 ? (
-              <Button
-                variant="contained"
-                onClick={handleSubmit}
-                disabled={submitting}
-                startIcon={submitting ? <CircularProgress size={20} /> : null}
-              >
-                {submitting ? 'Submitting...' : 'Submit Application'}
-              </Button>
-            ) : (
-              <Button variant="contained" onClick={handleNext}>
-                Next
-              </Button>
+      <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+        <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3, mb: 4 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+        </Box>
+        <Container maxWidth="sm" sx={{ py: 2 }}>
+          <Paper sx={{ p: { xs: 3, sm: 5 }, borderRadius: 3 }}>
+            <Typography variant="h4" align="center" sx={{ fontWeight: 700, mb: 1 }}>
+              Apply for Spoonbill
+            </Typography>
+            <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 4 }}>
+              Dental claims financing — apply in under 5 minutes.
+            </Typography>
+
+            <Box sx={{ mb: 4, px: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                {steps.map((label, i) => (
+                  <Box key={label} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                    <Box sx={{
+                      width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 600,
+                      bgcolor: i < activeStep ? tokens.colors.status.success : i === activeStep ? tokens.colors.accent[600] : tokens.colors.surfaceHover,
+                      color: i <= activeStep ? '#fff' : tokens.colors.text.muted,
+                      border: i === activeStep ? `2px solid ${tokens.colors.accent[700]}` : i < activeStep ? `2px solid ${tokens.colors.status.success}` : `2px solid ${tokens.colors.border.light}`,
+                      transition: 'all 0.2s',
+                    }}>
+                      {i < activeStep ? '\u2713' : i + 1}
+                    </Box>
+                    <Typography variant="caption" sx={{ mt: 0.5, fontSize: '0.65rem', color: i === activeStep ? tokens.colors.accent[700] : tokens.colors.text.muted, fontWeight: i === activeStep ? 600 : 400 }}>
+                      {label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Box sx={{ height: 3, bgcolor: tokens.colors.border.light, borderRadius: 2, mt: 1, position: 'relative', overflow: 'hidden' }}>
+                <Box sx={{ height: '100%', bgcolor: tokens.colors.accent[600], borderRadius: 2, width: `${(activeStep / (steps.length - 1)) * 100}%`, transition: 'width 0.3s ease' }} />
+              </Box>
+            </Box>
+
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {submitError}
+              </Alert>
             )}
-          </Box>
-        </Paper>
-      </Container>
+
+            {getStepContent(activeStep)}
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, pt: 3, borderTop: `1px solid ${tokens.colors.border.light}` }}>
+              <Button
+                disabled={activeStep === 0}
+                onClick={handleBack}
+                variant="outlined"
+                size="large"
+              >
+                Back
+              </Button>
+              {activeStep === steps.length - 1 ? (
+                <Button
+                  variant="contained"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  size="large"
+                  startIcon={submitting ? <CircularProgress size={20} /> : null}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Application'}
+                </Button>
+              ) : (
+                <Button variant="contained" onClick={handleNext} size="large">
+                  Continue
+                </Button>
+              )}
+            </Box>
+          </Paper>
+        </Container>
+      </Box>
     </ThemeProvider>
   );
 }

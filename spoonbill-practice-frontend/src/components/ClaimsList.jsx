@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
+import { tokens } from '../theme.js';
 
 const statusColors = {
   NEW: 'default',
@@ -82,7 +83,7 @@ function ClaimsList({ claims, onClaimSelect, onSubmitClick, onFilterChange }) {
         </Button>
       </Box>
 
-      <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }} elevation={0}>
+      <Paper sx={{ p: 2.5, mb: 2 }} elevation={0}>
         <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>Filters</Typography>
         <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
           <TextField
@@ -129,11 +130,13 @@ function ClaimsList({ claims, onClaimSelect, onSubmitClick, onFilterChange }) {
       </Paper>
 
       {claims.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center', border: '1px solid #e0e0e0' }} elevation={0}>
-          <Typography color="text.secondary">No claims yet. Submit your first claim to get started.</Typography>
+        <Paper sx={{ p: 6, textAlign: 'center' }} elevation={0}>
+          <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>No claims yet</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Submit your first claim to get started.</Typography>
+          <Button variant="outlined" size="small" onClick={onSubmitClick}>Submit a Claim</Button>
         </Paper>
       ) : (
-        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0' }}>
+        <TableContainer component={Paper} elevation={0}>
           <Table>
             <TableHead>
               <TableRow>
@@ -154,7 +157,7 @@ function ClaimsList({ claims, onClaimSelect, onSubmitClick, onFilterChange }) {
                   sx={{ cursor: 'pointer' }}
                   onClick={() => onClaimSelect(claim)}
                 >
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{claim.claim_token}</TableCell>
+                  <TableCell sx={{ fontFamily: tokens.typography.mono, fontSize: '0.8rem', fontWeight: 500 }}>{claim.claim_token}</TableCell>
                   <TableCell>{claim.patient_name || '-'}</TableCell>
                   <TableCell>{claim.payer}</TableCell>
                   <TableCell align="right">{formatAmount(claim.amount_cents)}</TableCell>

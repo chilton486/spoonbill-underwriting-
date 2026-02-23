@@ -1,12 +1,15 @@
 import * as React from 'react'
 import Container from '@mui/material/Container'
+import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
+import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
+import { themeTokens as tokens } from '../theme.js'
 
 import { login, getCurrentUser } from '../api.js'
 
@@ -32,15 +35,19 @@ export default function LoginPage({ onLogin }) {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Paper sx={{ p: 4 }}>
-        <Stack spacing={3}>
-          <Stack spacing={1} sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" sx={{ fontWeight: 900 }}>Spoonbill</Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Internal System of Record
-            </Typography>
-          </Stack>
+    <Box>
+      <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+      </Box>
+      <Container maxWidth="sm" sx={{ py: 8 }}>
+        <Paper sx={{ p: 4 }}>
+          <Stack spacing={3}>
+            <Stack spacing={1} sx={{ textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>Internal Console</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Sign in to manage claims, practices, and payments.
+              </Typography>
+            </Stack>
 
           {error && <Alert severity="error">{error}</Alert>}
 
@@ -74,8 +81,9 @@ export default function LoginPage({ onLogin }) {
               </Button>
             </Stack>
           </form>
-        </Stack>
-      </Paper>
-    </Container>
+          </Stack>
+        </Paper>
+      </Container>
+    </Box>
   )
 }
