@@ -176,21 +176,21 @@ export default function App() {
         <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
           <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, px: 3, py: 1.5 }}>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', maxWidth: 1400, mx: 'auto' }}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
-                <Chip label="Internal Console" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[700], fontWeight: 600, fontSize: '0.7rem' }} />
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em' }}>Spoonbill</Typography>
+                <Chip label="Internal Console" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[600], fontWeight: 600, fontSize: '0.7rem' }} />
               </Stack>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Chip
                   label={user.role === 'ADMIN' ? 'Admin' : 'Ops'}
                   size="small"
-                  sx={{ bgcolor: tokens.colors.text.primary, color: '#fff', fontWeight: 600, fontSize: '0.7rem' }}
+                  sx={{ bgcolor: tokens.colors.surfaceHover, color: tokens.colors.text.secondary, fontWeight: 600, fontSize: '0.7rem' }}
                 />
                 <Typography variant="caption" color="text.secondary">{user.email}</Typography>
                 <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
                   + New Claim
                 </Button>
-                <Button variant="text" size="small" onClick={handleLogout} sx={{ color: tokens.colors.text.muted }}>
+                <Button variant="outlined" size="small" onClick={handleLogout}>
                   Logout
                 </Button>
               </Stack>

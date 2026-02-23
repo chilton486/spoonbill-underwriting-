@@ -388,7 +388,7 @@ function SuccessScreen({ applicationId, email }) {
       </Typography>
       <Box sx={{ display: 'inline-block', bgcolor: tokens.colors.accent[50], border: `1px solid ${tokens.colors.accent[200]}`, borderRadius: 2, px: 3, py: 1.5, my: 2 }}>
         <Typography variant="caption" color="text.secondary">Application ID</Typography>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: tokens.colors.accent[600] }}>
           #{applicationId}
         </Typography>
       </Box>
@@ -702,7 +702,7 @@ function ApplicationForm() {
         <CssBaseline />
         <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
           <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3, mb: 4 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em' }}>Spoonbill</Typography>
           </Box>
           <Container maxWidth="sm" sx={{ py: 4 }}>
             <Paper sx={{ p: 5, borderRadius: 3 }}>
@@ -719,7 +719,7 @@ function ApplicationForm() {
       <CssBaseline />
       <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
         <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3, mb: 4 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em' }}>Spoonbill</Typography>
         </Box>
         <Container maxWidth="sm" sx={{ py: 2 }}>
           <Paper sx={{ p: { xs: 3, sm: 5 }, borderRadius: 3 }}>
@@ -743,7 +743,7 @@ function ApplicationForm() {
                     }}>
                       {i < activeStep ? '\u2713' : i + 1}
                     </Box>
-                    <Typography variant="caption" sx={{ mt: 0.5, fontSize: '0.65rem', color: i === activeStep ? tokens.colors.accent[700] : tokens.colors.text.muted, fontWeight: i === activeStep ? 600 : 400 }}>
+                    <Typography variant="caption" sx={{ mt: 0.5, fontSize: '0.65rem', color: i === activeStep ? tokens.colors.accent[600] : tokens.colors.text.muted, fontWeight: i === activeStep ? 600 : 400 }}>
                       {label}
                     </Typography>
                   </Box>
