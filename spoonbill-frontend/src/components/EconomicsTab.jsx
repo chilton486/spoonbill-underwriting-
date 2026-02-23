@@ -181,21 +181,23 @@ export default function EconomicsTab() {
               <TableHead>
                 <TableRow>
                   <TableCell>Practice</TableCell>
-                  <TableCell>Payments</TableCell>
-                  <TableCell>Total Funded</TableCell>
+                  <TableCell>ID</TableCell>
+                  <TableCell align="right">Payments</TableCell>
+                  <TableCell align="right">Total Funded</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {(exposure.by_practice || []).map((row) => (
                   <TableRow key={row.practice_id}>
                     <TableCell>{row.practice_name}</TableCell>
-                    <TableCell>{row.payment_count}</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>{fmt(row.total_funded_cents)}</TableCell>
+                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>#{row.practice_id}</TableCell>
+                    <TableCell align="right">{row.payment_count}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(row.total_funded_cents)}</TableCell>
                   </TableRow>
                 ))}
                 {(exposure.by_practice || []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={3} align="center">
+                    <TableCell colSpan={4} align="center">
                       <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>No exposure data</Typography>
                     </TableCell>
                   </TableRow>

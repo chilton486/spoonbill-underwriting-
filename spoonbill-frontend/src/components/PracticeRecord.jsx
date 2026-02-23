@@ -23,6 +23,35 @@ import { tokens } from '../theme.js'
 import { getPracticeCrm } from '../api.js'
 import AgenticOpsPanel from './AgenticOpsPanel.jsx'
 
+const ACTION_LABELS = {
+  CLAIM_IMPORTED: 'Claim Imported',
+  CLAIM_SUBMITTED: 'Claim Submitted',
+  CLAIM_APPROVED: 'Claim Approved',
+  CLAIM_DECLINED: 'Claim Declined',
+  CLAIM_PAID: 'Claim Paid',
+  CLAIM_CLOSED: 'Claim Closed',
+  CLAIM_EXCEPTION: 'Payment Exception',
+  PAYMENT_SENT: 'Payment Sent',
+  PAYMENT_CONFIRMED: 'Payment Confirmed',
+  PAYMENT_FAILED: 'Payment Failed',
+  PAYMENT_RETRIED: 'Payment Retried',
+  PAYMENT_CANCELLED: 'Payment Cancelled',
+  ACTION_PROPOSED: 'Action Proposed',
+  ACTION_EXECUTED: 'Action Executed',
+  ontology_rebuilt: 'Ontology Rebuilt',
+  ontology_built: 'Ontology Built',
+  LIMIT_ADJUSTED: 'Limit Adjusted',
+  FUNDING_PAUSED: 'Funding Paused',
+  FUNDING_RESUMED: 'Funding Resumed',
+  USER_INVITED: 'User Invited',
+  USER_ACTIVATED: 'User Activated',
+}
+
+function formatAction(action) {
+  if (ACTION_LABELS[action]) return ACTION_LABELS[action]
+  return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function fmt(cents) {
   if (cents == null) return '$0.00'
   return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -140,7 +169,7 @@ export default function PracticeRecord({ practiceId, onBack }) {
             <Stack divider={<Divider />}>
               {timeline.map((event) => (
                 <Stack key={event.id} direction="row" spacing={2} sx={{ px: 3, py: 1.5 }} alignItems="center">
-                  <Chip label={event.action} size="small" variant="outlined" sx={{ minWidth: 120 }} />
+                  <Chip label={formatAction(event.action)} size="small" variant="outlined" sx={{ minWidth: 120 }} />
                   <Typography variant="body2" sx={{ flex: 1 }}>
                     {event.from_status && event.to_status ? `${event.from_status} → ${event.to_status}` : ''}
                     {event.claim_id ? ` (Claim #${event.claim_id})` : ''}
