@@ -309,7 +309,7 @@ function PracticeDetailDialog({ open, onClose, practiceId, onInviteReissued }) {
   );
 }
 
-export default function PracticesList() {
+export default function PracticesList({ onSelectPractice }) {
   const [practices, setPractices] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
@@ -465,13 +465,24 @@ export default function PracticesList() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => openDetail(practice.id)}
-                    >
-                      View
-                    </Button>
+                    <Stack direction="row" spacing={1}>
+                      {onSelectPractice && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => onSelectPractice(practice.id)}
+                        >
+                          Open
+                        </Button>
+                      )}
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => openDetail(practice.id)}
+                      >
+                        Details
+                      </Button>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}

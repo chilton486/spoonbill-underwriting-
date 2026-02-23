@@ -222,6 +222,52 @@ export async function getPaymentExceptions() {
   return request('/api/claims?status=PAYMENT_EXCEPTION')
 }
 
+// Ops / Economics API
+export async function getEconomicsSummary(currency = 'USD') {
+  return request(`/ops/economics/summary?currency=${encodeURIComponent(currency)}`)
+}
+
+export async function getEconomicsExposure() {
+  return request('/ops/economics/exposure')
+}
+
+export async function getEconomicsPaymentIntents(params = {}) {
+  const qs = new URLSearchParams()
+  if (params.status) qs.append('status', params.status)
+  if (params.practice_id) qs.append('practice_id', params.practice_id)
+  if (params.limit) qs.append('limit', params.limit)
+  if (params.offset) qs.append('offset', params.offset)
+  const queryString = qs.toString()
+  return request(`/ops/economics/payment-intents${queryString ? '?' + queryString : ''}`)
+}
+
+export async function getEconomicsExceptions() {
+  return request('/ops/economics/exceptions')
+}
+
+export async function getPracticeCrm(practiceId) {
+  return request(`/ops/practices/${practiceId}/crm`)
+}
+
+export async function generateActionProposals(practiceId = null) {
+  const qs = practiceId ? `?practice_id=${practiceId}` : ''
+  return request(`/ops/action-proposals/generate${qs}`, { method: 'POST' })
+}
+
+export async function executeActionProposal(proposal) {
+  return request('/ops/action-proposals/execute', {
+    method: 'POST',
+    body: JSON.stringify(proposal),
+  })
+}
+
+export async function validateActionProposal(proposal) {
+  return request('/ops/action-proposals/validate', {
+    method: 'POST',
+    body: JSON.stringify(proposal),
+  })
+}
+
 // Search API
 export async function searchClaims(query, status = null, practiceId = null) {
   const params = new URLSearchParams()
