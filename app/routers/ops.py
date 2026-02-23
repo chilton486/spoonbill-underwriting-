@@ -14,6 +14,9 @@ from ..models.payment import PaymentIntent
 from ..models.integration import IntegrationConnection
 from ..services.economics import EconomicsService
 from ..services.action_proposals import ActionProposalService
+from ..services.control_tower import ControlTowerService
+from ..services.reconciliation import ReconciliationService
+from ..services.playbooks import PlaybookService, PLAYBOOK_TEMPLATES
 from ..services.audit import AuditService
 from sqlalchemy import func, desc
 
@@ -237,3 +240,167 @@ def validate_action_proposal(
     current_user: User = Depends(require_spoonbill_user),
 ):
     return ActionProposalService.validate_proposal(db, proposal)
+
+
+@router.post("/action-proposals/simulate")
+def simulate_action_proposal(
+    proposal: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    return ActionProposalService.simulate_proposal(db, proposal)
+
+
+@router.get("/economics/control-tower")
+def get_control_tower(
+    currency: str = Query("USD"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    return ControlTowerService.get_control_tower(db, currency=currency)
+
+
+@router.get("/reconciliation/summary")
+def get_reconciliation_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    return ReconciliationService.get_summary(db)
+
+
+@router.get("/reconciliation/payment-intents")
+def get_reconciliation_payment_intents(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    return ReconciliationService.get_payment_intent_reconciliation(
+        db, status_filter=status_filter, limit=limit
+    )
+
+
+@router.post("/reconciliation/ingest")
+def ingest_reconciliation_data(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    ingest_type = payload.get("type")
+    if ingest_type == "balance":
+        return ReconciliationService.ingest_balance(
+            db,
+            facility=payload["facility"],
+            balance_cents=payload["balance_cents"],
+            as_of=payload["as_of"],
+            source=payload.get("source", "manual"),
+        )
+    elif ingest_type == "payment_confirmation":
+        return ReconciliationService.ingest_payment_confirmation(
+            db,
+            payment_intent_id=payload["payment_intent_id"],
+            rail_ref=payload.get("rail_ref"),
+            status=payload["status"],
+            confirmed_at=payload.get("confirmed_at"),
+            raw_json=payload.get("raw_json"),
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="type must be 'balance' or 'payment_confirmation'",
+        )
+
+
+@router.post("/reconciliation/resolve")
+def resolve_reconciliation_mismatch(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    result = ReconciliationService.resolve_mismatch(
+        db,
+        confirmation_id=payload["confirmation_id"],
+        resolution_note=payload.get("resolution_note", ""),
+        actor_user_id=current_user.id,
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "Not found"))
+    return result
+
+
+@router.get("/tasks")
+def get_tasks(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    practice_id: Optional[int] = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    return PlaybookService.get_tasks(
+        db,
+        status_filter=status_filter,
+        practice_id=practice_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post("/tasks/{task_id}/update")
+def update_task(
+    task_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    result = PlaybookService.update_task(
+        db,
+        task_id=task_id,
+        status=payload.get("status"),
+        owner_user_id=payload.get("owner_user_id"),
+        resolution_note=payload.get("resolution_note"),
+        actor_user_id=current_user.id,
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "Not found"))
+    return result
+
+
+@router.post("/playbooks/run")
+def run_playbook(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    result = PlaybookService.run_playbook(
+        db,
+        playbook_type=payload["playbook_type"],
+        practice_id=payload.get("practice_id"),
+        claim_id=payload.get("claim_id"),
+        payment_intent_id=payload.get("payment_intent_id"),
+        actor_user_id=current_user.id,
+    )
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=result.get("error", "Playbook failed"),
+        )
+    return result
+
+
+@router.get("/playbooks/templates")
+def get_playbook_templates(
+    current_user: User = Depends(require_spoonbill_user),
+):
+    return {
+        "templates": [
+            {
+                "type": k,
+                "title_template": v["title_template"],
+                "description": v["description"],
+                "priority": v["priority"],
+                "sla_hours": v["sla_hours"],
+            }
+            for k, v in PLAYBOOK_TEMPLATES.items()
+        ]
+    }
