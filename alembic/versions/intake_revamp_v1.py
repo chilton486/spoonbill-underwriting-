@@ -63,8 +63,11 @@ def upgrade() -> None:
         batch_op.alter_column("address", nullable=True)
         batch_op.alter_column("phone", nullable=True)
         batch_op.alter_column("practice_type", nullable=True)
+        batch_op.alter_column("provider_count", nullable=True)
+        batch_op.alter_column("operatory_count", nullable=True)
         batch_op.alter_column("avg_monthly_collections_range", nullable=True)
         batch_op.alter_column("insurance_vs_self_pay_mix", nullable=True)
+        batch_op.alter_column("urgency_level", nullable=True)
 
 
 def downgrade() -> None:
