@@ -272,21 +272,23 @@ function Dashboard() {
         <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
         </Box>
-        <Container maxWidth="sm">
-          <Box sx={{ mt: 8 }}>
-            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 700 }}>
-              Practice Portal
-            </Typography>
-            <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
-              Sign in to manage your practice claims and payments.
-            </Typography>
+        <Container maxWidth="sm" sx={{ py: 8 }}>
+          <Paper sx={{ p: 4 }}>
+            <Box sx={{ textAlign: 'center', mb: 3 }}>
+              <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
+                Practice Portal
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sign in to manage your practice claims and payments.
+              </Typography>
+            </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
             <LoginPage onLogin={handleLogin} />
-          </Box>
+          </Paper>
         </Container>
       </Box>
     );
