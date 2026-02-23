@@ -37,14 +37,14 @@ export default function LoginPage({ onLogin }) {
   return (
     <Box>
       <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em' }}>Spoonbill</Typography>
       </Box>
       <Container maxWidth="sm" sx={{ py: 8 }}>
-        <Paper sx={{ p: 4 }}>
+        <Paper sx={{ p: 5 }}>
           <Stack spacing={3}>
             <Stack spacing={1} sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>Internal Console</Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: tokens.colors.text.primary }}>Internal Console</Typography>
+              <Typography variant="body2" color="text.secondary">
                 Sign in to manage claims, practices, and payments.
               </Typography>
             </Stack>

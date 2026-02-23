@@ -270,10 +270,10 @@ function Dashboard() {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
         <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, py: 2, px: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em' }}>Spoonbill</Typography>
         </Box>
         <Container maxWidth="sm" sx={{ py: 8 }}>
-          <Paper sx={{ p: 4 }}>
+          <Paper sx={{ p: 5 }}>
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
                 Practice Portal
@@ -299,8 +299,8 @@ function Dashboard() {
       <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, px: 3, py: 1.5 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: 1200, mx: 'auto' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.accent[700] }}>Spoonbill</Typography>
-            <Chip label="Practice Portal" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[700], fontWeight: 600, fontSize: '0.7rem' }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em' }}>Spoonbill</Typography>
+            <Chip label="Practice Portal" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[600], fontWeight: 600, fontSize: '0.7rem' }} />
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Chip
@@ -311,13 +311,12 @@ function Dashboard() {
             <Typography variant="caption" color="text.secondary">
               {user.email}
             </Typography>
-            <Button variant="outlined" size="small" onClick={() => setSubmitDialogOpen(true)}>
+            <Button variant="contained" size="small" onClick={() => setSubmitDialogOpen(true)}>
               + Submit Claim
             </Button>
             <Button
-              variant="text"
+              variant="outlined"
               size="small"
-              sx={{ color: tokens.colors.text.muted }}
               onClick={handleLogout}
             >
               Logout
