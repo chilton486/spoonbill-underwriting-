@@ -1,5 +1,4 @@
 import * as React from 'react'
-import Container from '@mui/material/Container'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
@@ -10,14 +9,26 @@ import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import Paper from '@mui/material/Paper'
-import Skeleton from '@mui/material/Skeleton'
+import List from '@mui/material/List'
+import ListItemButton from '@mui/material/ListItemButton'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import ListItemText from '@mui/material/ListItemText'
+import Divider from '@mui/material/Divider'
 import { ThemeProvider } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
-
-import { theme, themeTokens as tokens } from './theme.js'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import SearchIcon from '@mui/icons-material/Search'
+import DescriptionIcon from '@mui/icons-material/Description'
+import InboxIcon from '@mui/icons-material/Inbox'
+import BusinessIcon from '@mui/icons-material/Business'
+import PaymentIcon from '@mui/icons-material/Payment'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import ShowChartIcon from '@mui/icons-material/ShowChart'
+import SmartToyIcon from '@mui/icons-material/SmartToy'
+import ExtensionIcon from '@mui/icons-material/Extension'
+
+import { theme, themeTokens as tokens } from './theme.js'
 
 import {
   getClaims,
@@ -34,9 +45,25 @@ import CreateClaimDialog from './components/CreateClaimDialog.jsx'
 import ApplicationsQueue from './components/ApplicationsQueue.jsx'
 import PracticesList from './components/PracticesList.jsx'
 import PaymentExceptions from './components/PaymentExceptions.jsx'
+import EconomicsTab from './components/EconomicsTab.jsx'
+import PracticeRecord from './components/PracticeRecord.jsx'
+import AgenticOpsPanel from './components/AgenticOpsPanel.jsx'
 
 const STATUSES = ['NEW', 'NEEDS_REVIEW', 'APPROVED', 'PAID', 'COLLECTING', 'CLOSED', 'DECLINED', 'PAYMENT_EXCEPTION']
-const MAIN_TABS = ['Claims', 'Applications', 'Practices', 'Payment Exceptions']
+
+const NAV_SECTIONS = [
+  { key: 'claims', label: 'Claims', icon: DescriptionIcon },
+  { key: 'applications', label: 'Applications', icon: InboxIcon },
+  { key: 'practices', label: 'Practices', icon: BusinessIcon },
+  { key: 'payments', label: 'Payments', icon: PaymentIcon },
+  { key: 'integrations', label: 'Integrations', icon: ExtensionIcon },
+  { key: 'exceptions', label: 'Exceptions', icon: WarningAmberIcon },
+  { divider: true },
+  { key: 'economics', label: 'Economics', icon: ShowChartIcon },
+  { key: 'agentic', label: 'Agentic Ops', icon: SmartToyIcon },
+]
+
+const SIDEBAR_WIDTH = 220
 
 export default function App() {
   const [user, setUser] = React.useState(null)
@@ -47,10 +74,11 @@ export default function App() {
   const [detailOpen, setDetailOpen] = React.useState(false)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState(0)
-  const [mainTab, setMainTab] = React.useState(0)
+  const [navSection, setNavSection] = React.useState('claims')
   const [loadingClaimId, setLoadingClaimId] = React.useState(null)
   const [claimSearchInput, setClaimSearchInput] = React.useState('')
   const [claimSearchQuery, setClaimSearchQuery] = React.useState('')
+  const [selectedPracticeId, setSelectedPracticeId] = React.useState(null)
 
   const refresh = React.useCallback(async (query = null) => {
     try {
@@ -66,7 +94,6 @@ export default function App() {
     }
   }, [])
 
-  // Debounced claim search
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setClaimSearchQuery(claimSearchInput)
@@ -74,7 +101,6 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [claimSearchInput])
 
-  // Refresh claims when search query changes
   React.useEffect(() => {
     if (user) {
       refresh(claimSearchQuery || null)
@@ -110,7 +136,7 @@ export default function App() {
     if (!user) return
     const id = setInterval(() => {
       refresh().catch(() => {})
-    }, 3000)
+    }, 10000)
     return () => clearInterval(id)
   }, [user, refresh])
 
@@ -145,71 +171,136 @@ export default function App() {
     return counts
   }, [claims])
 
-    if (loading) {
-      return (
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Stack spacing={2} alignItems="center">
-              <CircularProgress size={36} />
-              <Typography variant="body2" color="text.secondary">Loading console...</Typography>
-            </Stack>
-          </Box>
-        </ThemeProvider>
-      )
-    }
+  const handlePracticeSelect = (practiceId) => {
+    setSelectedPracticeId(practiceId)
+  }
 
-    if (!user) {
-      return (
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
-            <LoginPage onLogin={handleLogin} />
-          </Box>
-        </ThemeProvider>
-      )
-    }
+  if (loading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Stack spacing={2} alignItems="center">
+            <CircularProgress size={36} />
+            <Typography variant="body2" color="text.secondary">Loading console...</Typography>
+          </Stack>
+        </Box>
+      </ThemeProvider>
+    )
+  }
 
+  if (!user) {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Box sx={{ minHeight: '100vh', bgcolor: tokens.colors.background }}>
+          <LoginPage onLogin={handleLogin} />
+        </Box>
+      </ThemeProvider>
+    )
+  }
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: tokens.colors.background }}>
+        <Box
+          sx={{
+            width: SIDEBAR_WIDTH,
+            flexShrink: 0,
+            bgcolor: tokens.colors.surface,
+            borderRight: `1px solid ${tokens.colors.border.light}`,
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            bottom: 0,
+            zIndex: 10,
+          }}
+        >
+          <Box sx={{ px: 2, py: 2 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em', fontSize: '1rem' }}>Spoonbill</Typography>
+              <Chip label="Ops" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[600], fontWeight: 600, fontSize: '0.65rem', height: 20 }} />
+            </Stack>
+          </Box>
+
+          <Divider />
+
+          <List sx={{ flex: 1, py: 1, px: 1 }}>
+            {NAV_SECTIONS.map((item, idx) => {
+              if (item.divider) return <Divider key={`div-${idx}`} sx={{ my: 1 }} />
+              const Icon = item.icon
+              const isActive = navSection === item.key
+              return (
+                <ListItemButton
+                  key={item.key}
+                  selected={isActive}
+                  onClick={() => {
+                    setNavSection(item.key)
+                    setSelectedPracticeId(null)
+                  }}
+                  sx={{
+                    borderRadius: tokens.radius.sm,
+                    mb: 0.25,
+                    py: 0.75,
+                    px: 1.5,
+                    '&.Mui-selected': {
+                      bgcolor: tokens.colors.accent[50],
+                      color: tokens.colors.accent[700],
+                      '&:hover': { bgcolor: tokens.colors.accent[100] },
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 32, color: isActive ? tokens.colors.accent[600] : tokens.colors.text.muted }}>
+                    <Icon sx={{ fontSize: 18 }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.label}
+                    primaryTypographyProps={{
+                      fontSize: '0.8125rem',
+                      fontWeight: isActive ? 600 : 400,
+                    }}
+                  />
+                </ListItemButton>
+              )
+            })}
+          </List>
+
+          <Divider />
+          <Box sx={{ p: 1.5 }}>
+            <Stack spacing={0.5}>
+              <Typography variant="caption" sx={{ px: 0.5 }}>{user.email}</Typography>
+              <Button variant="outlined" size="small" fullWidth onClick={handleLogout} sx={{ fontSize: '0.75rem' }}>Logout</Button>
+            </Stack>
+          </Box>
+        </Box>
+
+        <Box sx={{ flex: 1, ml: `${SIDEBAR_WIDTH}px`, overflow: 'auto' }}>
           <Box sx={{ bgcolor: tokens.colors.surface, borderBottom: `1px solid ${tokens.colors.border.light}`, px: 3, py: 1.5 }}>
-            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', maxWidth: 1400, mx: 'auto' }}>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Typography variant="h6" sx={{ fontWeight: 700, color: tokens.colors.text.primary, letterSpacing: '-0.01em' }}>Spoonbill</Typography>
-                <Chip label="Internal Console" size="small" sx={{ bgcolor: tokens.colors.accent[50], color: tokens.colors.accent[600], fontWeight: 600, fontSize: '0.7rem' }} />
-              </Stack>
-              <Stack direction="row" spacing={1.5} alignItems="center">
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="h5" sx={{ fontWeight: 700, textTransform: 'capitalize' }}>
+                {navSection === 'agentic' ? 'Agentic Ops' : navSection}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
                 <Chip
                   label={user.role === 'ADMIN' ? 'Admin' : 'Ops'}
                   size="small"
                   sx={{ bgcolor: tokens.colors.surfaceHover, color: tokens.colors.text.secondary, fontWeight: 600, fontSize: '0.7rem' }}
                 />
-                <Typography variant="caption" color="text.secondary">{user.email}</Typography>
-                <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
-                  + New Claim
-                </Button>
-                <Button variant="outlined" size="small" onClick={handleLogout}>
-                  Logout
-                </Button>
+                {navSection === 'claims' && (
+                  <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>+ New Claim</Button>
+                )}
               </Stack>
             </Stack>
           </Box>
 
-          <Box sx={{ maxWidth: 1400, mx: 'auto', px: 3, py: 3 }}>
+          <Box sx={{ p: 3 }}>
             <Stack spacing={3}>
               {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-              <Paper sx={{ px: 0.5, py: 0 }}>
-                <Tabs value={mainTab} onChange={(e, v) => setMainTab(v)}>
-                  {MAIN_TABS.map((tab) => (
-                    <Tab key={tab} label={tab} />
-                  ))}
-                </Tabs>
-              </Paper>
-
-              {mainTab === 0 && (
+              {navSection === 'claims' && (
                 <>
                   <Stack direction="row" justifyContent="flex-end" alignItems="center">
                     <TextField
@@ -263,28 +354,50 @@ export default function App() {
                 </>
               )}
 
-              {mainTab === 1 && <ApplicationsQueue />}
-              {mainTab === 2 && <PracticesList />}
-              {mainTab === 3 && <PaymentExceptions />}
+              {navSection === 'applications' && <ApplicationsQueue />}
+
+              {navSection === 'practices' && !selectedPracticeId && (
+                <PracticesList onSelectPractice={handlePracticeSelect} />
+              )}
+              {navSection === 'practices' && selectedPracticeId && (
+                <PracticeRecord practiceId={selectedPracticeId} onBack={() => setSelectedPracticeId(null)} />
+              )}
+
+              {navSection === 'payments' && (
+                <EconomicsTab initialTab={0} />
+              )}
+
+              {navSection === 'integrations' && (
+                <Paper sx={{ p: 4, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Integration management is available on each Practice record page. Select a practice to view its integrations.
+                  </Typography>
+                </Paper>
+              )}
+
+              {navSection === 'exceptions' && <PaymentExceptions />}
+              {navSection === 'economics' && <EconomicsTab />}
+              {navSection === 'agentic' && <AgenticOpsPanel />}
             </Stack>
           </Box>
-
-          <ClaimDetailDialog
-            open={detailOpen}
-            onClose={() => setDetailOpen(false)}
-            claim={selectedClaim}
-            onRefresh={refresh}
-          />
-
-          <CreateClaimDialog
-            open={createOpen}
-            onClose={() => setCreateOpen(false)}
-            onCreated={() => {
-              setCreateOpen(false)
-              refresh()
-            }}
-          />
         </Box>
-      </ThemeProvider>
-    )
+
+        <ClaimDetailDialog
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
+          claim={selectedClaim}
+          onRefresh={refresh}
+        />
+
+        <CreateClaimDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => {
+            setCreateOpen(false)
+            refresh()
+          }}
+        />
+      </Box>
+    </ThemeProvider>
+  )
 }
