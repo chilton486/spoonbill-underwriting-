@@ -22,7 +22,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import BusinessIcon from '@mui/icons-material/Business'
 import { tokens } from '../theme.js'
 
-import { getPracticeCrm } from '../api.js'
+import { getPracticeCrm, searchClaims } from '../api.js'
 import AgenticOpsPanel from './AgenticOpsPanel.jsx'
 
 const ACTION_LABELS = {
@@ -111,13 +111,27 @@ const ACTION_CHIP_COLOR = {
   LIMIT_ADJUSTED: 'warning',
 }
 
+const CLAIM_STATUS_COLOR = {
+  NEW: 'default',
+  NEEDS_REVIEW: 'warning',
+  APPROVED: 'success',
+  PAID: 'success',
+  COLLECTING: 'info',
+  CLOSED: 'default',
+  DECLINED: 'error',
+  PAYMENT_EXCEPTION: 'error',
+}
+
 export default function PracticeRecord({ practiceId, onBack }) {
   const [data, setData] = React.useState(null)
   const [loading, setLoading] = React.useState(true)
   const [apiError, setApiError] = React.useState(null)
   const [tab, setTab] = React.useState(0)
+  const [claims, setClaims] = React.useState([])
+  const [claimsLoading, setClaimsLoading] = React.useState(false)
+  const [claimsError, setClaimsError] = React.useState(null)
 
-  const loadData = React.useCallback(() => {
+  const loadData= React.useCallback(() => {
     let mounted = true
     setLoading(true)
     setApiError(null)
@@ -131,14 +145,35 @@ export default function PracticeRecord({ practiceId, onBack }) {
     return () => { mounted = false }
   }, [practiceId])
 
+  const loadClaims = React.useCallback(() => {
+    let mounted = true
+    setClaimsLoading(true)
+    setClaimsError(null)
+    searchClaims(null, null, practiceId).then((result) => {
+      if (mounted) setClaims(result)
+    }).catch((e) => {
+      if (mounted) setClaimsError(getApiError(e))
+    }).finally(() => {
+      if (mounted) setClaimsLoading(false)
+    })
+    return () => { mounted = false }
+  }, [practiceId])
+
   React.useEffect(() => { loadData() }, [loadData])
 
-  const practice = data?.practice
+  React.useEffect(() => {
+    if (tab === 2) loadClaims()
+  }, [tab, loadClaims])
+
+  const practice= data?.practice
   const kpis = data?.kpis || {}
   const timeline = data?.timeline || []
   const integrations = data?.integrations || []
-  const recent_exceptions = data?.recent_exceptions || []
   const utilization = kpis.utilization_pct || 0
+
+  const exceptionClaims = claims.filter(c => c.status === 'PAYMENT_EXCEPTION')
+  const recentClaims = claims.filter(c => c.status !== 'PAYMENT_EXCEPTION')
+  const claimCountsByStatus = kpis.claim_counts_by_status || {}
 
   return (
     <Stack spacing={3}>
@@ -204,13 +239,13 @@ export default function PracticeRecord({ practiceId, onBack }) {
               {timeline.length > 0 && <Chip label={timeline.length} size="small" sx={{ height: 20, fontSize: '0.7rem', minWidth: 24 }} />}
             </Stack>
           } />
-          <Tab label="Integrations" />
           <Tab label={
             <Stack direction="row" spacing={0.75} alignItems="center">
-              <span>Exceptions</span>
-              {recent_exceptions.length > 0 && <Chip label={recent_exceptions.length} size="small" color="error" sx={{ height: 20, fontSize: '0.7rem', minWidth: 24 }} />}
+              <span>Claims</span>
+              {kpis.total_claims > 0 && <Chip label={kpis.total_claims} size="small" sx={{ height: 20, fontSize: '0.7rem', minWidth: 24 }} />}
             </Stack>
           } />
+          <Tab label="Integrations" />
           <Tab label="Actions" />
         </Tabs>
       </Paper>
@@ -250,6 +285,23 @@ export default function PracticeRecord({ practiceId, onBack }) {
               </Stack>
             ) : null}
           </Paper>
+
+          {Object.keys(claimCountsByStatus).length > 0 && (
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Claims by Status</Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {Object.entries(claimCountsByStatus).map(([status, count]) => (
+                  <Chip
+                    key={status}
+                    label={status.replace(/_/g, ' ') + ': ' + count}
+                    size="small"
+                    color={CLAIM_STATUS_COLOR[status] || 'default'}
+                    variant="outlined"
+                  />
+                ))}
+              </Stack>
+            </Paper>
+          )}
 
           <Stack direction="row" spacing={2}>
             <Paper sx={{ p: 2, flex: 1 }}>
@@ -327,6 +379,109 @@ export default function PracticeRecord({ practiceId, onBack }) {
       )}
 
       {tab === 2 && (
+        <Stack spacing={3}>
+          {claimsError && (
+            <Alert severity={claimsError.severity} onClose={() => setClaimsError(null)}>
+              {claimsError.message}
+            </Alert>
+          )}
+
+          {exceptionClaims.length > 0 && (
+            <>
+              <Typography variant="subtitle2" sx={{ color: tokens.colors.status.error }}>
+                Exceptions ({exceptionClaims.length})
+              </Typography>
+              <TableContainer component={Paper}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Claim ID</TableCell>
+                      <TableCell>Patient</TableCell>
+                      <TableCell>Payer</TableCell>
+                      <TableCell align="right">Amount</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Updated</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {exceptionClaims.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell sx={{ fontFamily: tokens.typography.mono, fontSize: '0.8rem' }}>#{c.id}</TableCell>
+                        <TableCell>{c.patient_name || '-'}</TableCell>
+                        <TableCell>{c.payer || '-'}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(c.amount_cents)}</TableCell>
+                        <TableCell><Chip label="EXCEPTION" size="small" color="error" /></TableCell>
+                        <TableCell>{c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
+
+          <Typography variant="subtitle2">
+            Recent Claims {recentClaims.length > 0 ? '(' + recentClaims.length + ')' : ''}
+          </Typography>
+
+          {claimsLoading ? (
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Claim ID</TableCell>
+                    <TableCell>Patient</TableCell>
+                    <TableCell>Payer</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Updated</TableCell>
+                  </TableRow>
+                </TableHead>
+                <SkeletonRows rows={5} cols={6} />
+              </Table>
+            </TableContainer>
+          ) : recentClaims.length === 0 && exceptionClaims.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">No claims found for this practice</Typography>
+            </Paper>
+          ) : recentClaims.length === 0 ? null : (
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Claim ID</TableCell>
+                    <TableCell>Patient</TableCell>
+                    <TableCell>Payer</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Updated</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentClaims.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell sx={{ fontFamily: tokens.typography.mono, fontSize: '0.8rem' }}>#{c.id}</TableCell>
+                      <TableCell>{c.patient_name || '-'}</TableCell>
+                      <TableCell>{c.payer || '-'}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(c.amount_cents)}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={c.status.replace(/_/g, ' ')}
+                          size="small"
+                          color={CLAIM_STATUS_COLOR[c.status] || 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>{c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Stack>
+      )}
+
+      {tab === 3 && (
         <Stack spacing={2}>
           {loading && !data ? (
             <TableContainer component={Paper}>
@@ -367,56 +522,6 @@ export default function PracticeRecord({ practiceId, onBack }) {
                         />
                       </TableCell>
                       <TableCell>{ic.last_synced_at ? new Date(ic.last_synced_at).toLocaleString() : 'Never'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Stack>
-      )}
-
-      {tab === 3 && (
-        <Stack spacing={2}>
-          {loading && !data ? (
-            <TableContainer component={Paper}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Claim</TableCell>
-                    <TableCell>Payer</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Updated</TableCell>
-                  </TableRow>
-                </TableHead>
-                <SkeletonRows rows={3} cols={5} />
-              </Table>
-            </TableContainer>
-          ) : recent_exceptions.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">No recent exceptions for this practice</Typography>
-            </Paper>
-          ) : (
-            <TableContainer component={Paper}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Claim</TableCell>
-                    <TableCell>Payer</TableCell>
-                    <TableCell align="right">Amount</TableCell>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Updated</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {recent_exceptions.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell sx={{ fontFamily: tokens.typography.mono, fontSize: '0.8rem' }}>#{c.id}</TableCell>
-                      <TableCell>{c.payer}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(c.amount_cents)}</TableCell>
-                      <TableCell><Chip label={c.exception_code || 'N/A'} size="small" color="error" /></TableCell>
-                      <TableCell>{c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
