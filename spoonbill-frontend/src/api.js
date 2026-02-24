@@ -333,6 +333,17 @@ export async function getPlaybookTemplates() {
   return request('/ops/playbooks/templates')
 }
 
+export async function computeUnderwritingScore(applicationId) {
+  return request(`/internal/applications/${applicationId}/score`, { method: 'POST' })
+}
+
+export async function overrideUnderwritingScore(applicationId, score, grade, reason) {
+  return request(`/internal/applications/${applicationId}/score/override`, {
+    method: 'POST',
+    body: JSON.stringify({ score, grade, reason }),
+  })
+}
+
 // Search API
 export async function searchClaims(query, status = null, practiceId = null) {
   const params = new URLSearchParams()

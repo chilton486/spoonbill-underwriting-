@@ -28,6 +28,7 @@ from ..schemas.practice_application import (
     ApplicationReviewRequest,
     ApplicationApprovalResult,
     ApplicationSubmissionResponse,
+    UnderwritingScoreOverride,
 )
 from ..services.audit import AuditService
 from .auth import require_spoonbill_role
@@ -140,36 +141,24 @@ def submit_application(
             detail="An application with this email is already pending review. Please contact support if you need to update your application.",
         )
     
-    application = PracticeApplication(
-        legal_name=application_data.legal_name,
-        address=application_data.address,
-        phone=application_data.phone,
-        website=application_data.website,
-        tax_id=application_data.tax_id,
-        practice_type=application_data.practice_type.value,
-        years_in_operation=application_data.years_in_operation,
-        provider_count=application_data.provider_count,
-        operatory_count=application_data.operatory_count,
-        avg_monthly_collections_range=application_data.avg_monthly_collections_range,
-        insurance_vs_self_pay_mix=application_data.insurance_vs_self_pay_mix,
-        top_payers=application_data.top_payers,
-        avg_ar_days=application_data.avg_ar_days,
-        billing_model=application_data.billing_model.value,
-        follow_up_frequency=application_data.follow_up_frequency,
-        practice_management_software=application_data.practice_management_software,
-        claims_per_month=application_data.claims_per_month,
-        electronic_claims=application_data.electronic_claims,
-        stated_goal=application_data.stated_goal,
-        urgency_level=application_data.urgency_level.value,
-        contact_name=application_data.contact_name,
-        contact_email=application_data.contact_email,
-        contact_phone=application_data.contact_phone,
-        status=ApplicationStatus.SUBMITTED.value,
-    )
+    excluded = {"company_url"}
+    app_dict = {
+        k: v for k, v in application_data.model_dump().items()
+        if k not in excluded
+    }
+    app_dict["status"] = ApplicationStatus.SUBMITTED.value
+
+    application = PracticeApplication(**app_dict)
     
     db.add(application)
     db.commit()
     db.refresh(application)
+
+    from ..services.underwriting_score import compute_underwriting_score
+    try:
+        compute_underwriting_score(db, application.id)
+    except Exception:
+        logger.warning("Underwriting score computation failed for app %s", application.id)
     
     return ApplicationSubmissionResponse(
         id=application.id,
@@ -556,6 +545,83 @@ def get_application_stats(
         "needs_info": needs_info,
         "approved": approved,
         "declined": declined,
+    }
+
+
+@router.post(
+    "/internal/applications/{application_id}/score",
+)
+def compute_score(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_role),
+):
+    from ..services.underwriting_score import compute_underwriting_score
+    try:
+        breakdown = compute_underwriting_score(db, application_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return breakdown
+
+
+@router.post(
+    "/internal/applications/{application_id}/score/override",
+)
+def override_score(
+    application_id: int,
+    override: UnderwritingScoreOverride,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_role),
+):
+    import json
+    application = db.query(PracticeApplication).filter(
+        PracticeApplication.id == application_id
+    ).first()
+    if not application:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    old_score = application.underwriting_score
+    old_grade = application.underwriting_grade
+
+    application.underwriting_score = override.score
+    application.underwriting_grade = override.grade
+
+    existing = {}
+    if application.underwriting_breakdown_json:
+        try:
+            existing = json.loads(application.underwriting_breakdown_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    existing["override"] = {
+        "score": override.score,
+        "grade": override.grade,
+        "reason": override.reason,
+        "by_user_id": current_user.id,
+        "at": datetime.utcnow().isoformat(),
+    }
+    application.underwriting_breakdown_json = json.dumps(existing)
+
+    AuditService.log_event(
+        db,
+        claim_id=None,
+        action="UNDERWRITING_SCORE_OVERRIDE",
+        actor_user_id=current_user.id,
+        metadata={
+            "application_id": application_id,
+            "old_score": old_score,
+            "old_grade": old_grade,
+            "new_score": override.score,
+            "new_grade": override.grade,
+            "reason": override.reason,
+        },
+    )
+
+    db.commit()
+    return {
+        "application_id": application_id,
+        "score": override.score,
+        "grade": override.grade,
+        "message": "Score overridden successfully.",
     }
 
 

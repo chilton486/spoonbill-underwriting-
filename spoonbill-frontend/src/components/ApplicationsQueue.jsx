@@ -20,7 +20,15 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 
-import { getApplications, getApplication, reviewApplication } from '../api.js';
+import MenuItem from '@mui/material/MenuItem';
+
+import { getApplications, getApplication, reviewApplication, computeUnderwritingScore, overrideUnderwritingScore } from '../api.js';
+
+const gradeColors = {
+  GREEN: { bg: '#d1fae5', color: '#065f46' },
+  YELLOW: { bg: '#fef3c7', color: '#92400e' },
+  RED: { bg: '#fee2e2', color: '#991b1b' },
+};
 
 const statusColors = {
   SUBMITTED: { bg: '#fef3c7', color: '#92400e' },
@@ -48,6 +56,62 @@ function formatDate(dateString) {
 }
 
 
+function ScoreOverrideDialog({ open, onClose, applicationId, currentScore, currentGrade, onOverrideComplete }) {
+  const [score, setScore] = React.useState(currentScore || '');
+  const [grade, setGrade] = React.useState(currentGrade || 'GREEN');
+  const [reason, setReason] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    if (open) {
+      setScore(currentScore || '');
+      setGrade(currentGrade || 'GREEN');
+      setReason('');
+      setError(null);
+    }
+  }, [open, currentScore, currentGrade]);
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) { setError('Reason is required'); return; }
+    const numScore = parseFloat(score);
+    if (isNaN(numScore) || numScore < 0 || numScore > 100) { setError('Score must be 0-100'); return; }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await overrideUnderwritingScore(applicationId, numScore, grade, reason);
+      onOverrideComplete();
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Override Underwriting Score</DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField label="Score (0-100)" type="number" value={score} onChange={(e) => setScore(e.target.value)} fullWidth slotProps={{ htmlInput: { min: 0, max: 100, step: 0.1 } }} />
+          <TextField select label="Grade" value={grade} onChange={(e) => setGrade(e.target.value)} fullWidth>
+            <MenuItem value="GREEN">GREEN</MenuItem>
+            <MenuItem value="YELLOW">YELLOW</MenuItem>
+            <MenuItem value="RED">RED</MenuItem>
+          </TextField>
+          <TextField label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} fullWidth multiline rows={2} required />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={submitting}>{submitting ? 'Saving...' : 'Override'}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplete }) {
   const [application, setApplication] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
@@ -55,6 +119,8 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
   const [reviewNotes, setReviewNotes] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
   const [approvalResult, setApprovalResult] = React.useState(null);
+  const [overrideOpen, setOverrideOpen] = React.useState(false);
+  const [recomputing, setRecomputing] = React.useState(false);
 
   React.useEffect(() => {
     if (open && applicationId) {
@@ -86,7 +152,28 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
     }
   };
 
+  const handleRecompute = async () => {
+    setRecomputing(true);
+    try {
+      await computeUnderwritingScore(applicationId);
+      const updated = await getApplication(applicationId);
+      setApplication(updated);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setRecomputing(false);
+    }
+  };
+
+  const handleOverrideComplete = async () => {
+    const updated = await getApplication(applicationId);
+    setApplication(updated);
+    onReviewComplete();
+  };
+
   const canReview = application && ['SUBMITTED', 'NEEDS_INFO'].includes(application.status);
+
+  const fmtCents = (v) => v != null ? '$' + (v / 100).toLocaleString() : '\u2014';
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -165,80 +252,90 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
               </Stack>
             </Box>
 
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Practice Information
-              </Typography>
-              <Typography variant="h6">{application.legal_name}</Typography>
-              <Typography variant="body2">{application.address}</Typography>
-              <Typography variant="body2">Phone: {application.phone}</Typography>
-              {application.website && (
-                <Typography variant="body2">Website: {application.website}</Typography>
-              )}
-              {application.tax_id && (
-                <Typography variant="body2">Tax ID: {application.tax_id}</Typography>
-              )}
-              <Typography variant="body2">Type: {application.practice_type.replace(/_/g, ' ')}</Typography>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Operations
-              </Typography>
-              <Typography variant="body2">Years in Operation: {application.years_in_operation}</Typography>
-              <Typography variant="body2">Providers: {application.provider_count}</Typography>
-              <Typography variant="body2">Operatories: {application.operatory_count}</Typography>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Financial
-              </Typography>
-              <Typography variant="body2">Monthly Collections: {application.avg_monthly_collections_range}</Typography>
-              <Typography variant="body2">Insurance Mix: {application.insurance_vs_self_pay_mix}</Typography>
-              {application.top_payers && (
-                <Typography variant="body2">Top Payers: {application.top_payers}</Typography>
-              )}
-              {application.avg_ar_days && (
-                <Typography variant="body2">Avg AR Days: {application.avg_ar_days}</Typography>
-              )}
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Billing
-              </Typography>
-              <Typography variant="body2">Billing Model: {application.billing_model}</Typography>
-              {application.follow_up_frequency && (
-                <Typography variant="body2">Follow-up Frequency: {application.follow_up_frequency}</Typography>
-              )}
-              {application.practice_management_software && (
-                <Typography variant="body2">Software: {application.practice_management_software}</Typography>
-              )}
-              {application.claims_per_month && (
-                <Typography variant="body2">Claims/Month: {application.claims_per_month}</Typography>
-              )}
-              <Typography variant="body2">
-                Electronic Claims: {application.electronic_claims ? 'Yes' : 'No'}
-              </Typography>
-            </Box>
-
-            {application.stated_goal && (
+            {application.underwriting_score != null && (
               <>
                 <Divider />
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Stated Goal
+                    Underwriting Score
                   </Typography>
-                  <Typography variant="body2">{application.stated_goal}</Typography>
+                  <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>{application.underwriting_score}</Typography>
+                    <Chip label={application.underwriting_grade} size="small" sx={{ bgcolor: gradeColors[application.underwriting_grade]?.bg, color: gradeColors[application.underwriting_grade]?.color, fontWeight: 600 }} />
+                  </Stack>
+                  <Stack direction="row" spacing={1}>
+                    <Button size="small" variant="outlined" onClick={handleRecompute} disabled={recomputing}>{recomputing ? 'Computing...' : 'Recompute'}</Button>
+                    <Button size="small" variant="outlined" color="warning" onClick={() => setOverrideOpen(true)}>Override</Button>
+                  </Stack>
+                </Box>
+              </>
+            )}
+            {application.underwriting_score == null && (
+              <>
+                <Divider />
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>Underwriting Score</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>No score computed yet.</Typography>
+                  <Button size="small" variant="outlined" onClick={handleRecompute} disabled={recomputing}>{recomputing ? 'Computing...' : 'Compute Score'}</Button>
+                </Box>
+              </>
+            )}
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Practice Identity
+              </Typography>
+              <Typography variant="h6">{application.legal_name}</Typography>
+              {application.dba && <Typography variant="body2">DBA: {application.dba}</Typography>}
+              {application.ein && <Typography variant="body2">EIN: {application.ein}</Typography>}
+              <Typography variant="body2">Years in Operation: {application.years_in_operation}</Typography>
+              {application.ownership_structure && <Typography variant="body2">Ownership: {application.ownership_structure.replace(/_/g, ' ')}</Typography>}
+              {application.prior_bankruptcy && <Typography variant="body2" color="error">Prior Bankruptcy: Yes</Typography>}
+              {application.pending_litigation && <Typography variant="body2" color="error">Pending Litigation: Yes</Typography>}
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>Revenue & Production</Typography>
+              <Typography variant="body2">Gross Production: {fmtCents(application.gross_production_cents)}</Typography>
+              <Typography variant="body2">Net Collections: {fmtCents(application.net_collections_cents)}</Typography>
+              {application.insurance_collections_cents != null && <Typography variant="body2">Insurance Collections: {fmtCents(application.insurance_collections_cents)}</Typography>}
+              {application.patient_collections_cents != null && <Typography variant="body2">Patient Collections: {fmtCents(application.patient_collections_cents)}</Typography>}
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>Payer & Claims</Typography>
+              {application.pct_ppo != null && <Typography variant="body2">PPO: {application.pct_ppo}%</Typography>}
+              {application.pct_medicaid != null && <Typography variant="body2">Medicaid: {application.pct_medicaid}%</Typography>}
+              {application.avg_claim_size_cents != null && <Typography variant="body2">Avg Claim Size: {fmtCents(application.avg_claim_size_cents)}</Typography>}
+              {application.avg_days_to_reimbursement != null && <Typography variant="body2">Days to Reimbursement: {application.avg_days_to_reimbursement}</Typography>}
+              {application.estimated_denial_rate != null && <Typography variant="body2">Denial Rate: {application.estimated_denial_rate}%</Typography>}
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>Billing Operations</Typography>
+              <Typography variant="body2">Billing Model: {application.billing_model}</Typography>
+              {application.practice_management_software && <Typography variant="body2">PMS: {application.practice_management_software}</Typography>}
+              {application.billing_staff_count != null && <Typography variant="body2">Billing Staff: {application.billing_staff_count}</Typography>}
+              <Typography variant="body2">RCM Manager: {application.dedicated_rcm_manager ? 'Yes' : 'No'}</Typography>
+              <Typography variant="body2">Written SOP: {application.written_billing_sop ? 'Yes' : 'No'}</Typography>
+              {application.avg_ar_days != null && <Typography variant="body2">Avg AR Days: {application.avg_ar_days}</Typography>}
+              {application.outstanding_ar_balance_cents != null && <Typography variant="body2">Outstanding AR: {fmtCents(application.outstanding_ar_balance_cents)}</Typography>}
+            </Box>
+
+            {application.why_spoonbill && (
+              <>
+                <Divider />
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>Why Spoonbill</Typography>
+                  <Typography variant="body2">{application.why_spoonbill}</Typography>
                 </Box>
               </>
             )}
@@ -331,6 +428,16 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
+      {application && (
+        <ScoreOverrideDialog
+          open={overrideOpen}
+          onClose={() => setOverrideOpen(false)}
+          applicationId={applicationId}
+          currentScore={application.underwriting_score}
+          currentGrade={application.underwriting_grade}
+          onOverrideComplete={handleOverrideComplete}
+        />
+      )}
     </Dialog>
   );
 }
@@ -408,9 +515,8 @@ export default function ApplicationsQueue() {
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Practice Name</TableCell>
-                <TableCell>Type</TableCell>
                 <TableCell>Contact</TableCell>
-                <TableCell>Urgency</TableCell>
+                <TableCell>Score</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Submitted</TableCell>
                 <TableCell>Actions</TableCell>
@@ -421,7 +527,6 @@ export default function ApplicationsQueue() {
                 <TableRow key={app.id} hover>
                   <TableCell>#{app.id}</TableCell>
                   <TableCell>{app.legal_name}</TableCell>
-                  <TableCell>{app.practice_type.replace(/_/g, ' ')}</TableCell>
                   <TableCell>
                     <Typography variant="body2">{app.contact_name}</Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -429,14 +534,14 @@ export default function ApplicationsQueue() {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={app.urgency_level}
-                      size="small"
-                      sx={{
-                        bgcolor: urgencyColors[app.urgency_level]?.bg || '#f3f4f6',
-                        color: urgencyColors[app.urgency_level]?.color || '#374151',
-                      }}
-                    />
+                    {app.underwriting_score != null ? (
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{app.underwriting_score}</Typography>
+                        <Chip label={app.underwriting_grade} size="small" sx={{ bgcolor: gradeColors[app.underwriting_grade]?.bg, color: gradeColors[app.underwriting_grade]?.color, fontWeight: 600, fontSize: '0.7rem' }} />
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">—</Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Chip
