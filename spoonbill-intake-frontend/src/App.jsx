@@ -74,12 +74,6 @@ const cashRangeOptions = [
   { value: 'OVER_500K', label: 'Over $500,000' },
 ];
 
-const cadenceOptions = [
-  { value: 'DAILY', label: 'Daily' },
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'BIWEEKLY', label: 'Bi-Weekly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-];
 
 const initialFormData = {
   legal_name: '',
@@ -117,7 +111,6 @@ const initialFormData = {
   existing_loc: '',
   monthly_debt_payments: '',
   missed_loan_payments_24m: false,
-  desired_funding_cadence: '',
   expected_monthly_funding: '',
   urgency_scale: 3,
   willing_to_integrate_api: false,
@@ -131,6 +124,20 @@ function dollarsToCents(val) {
   if (!val && val !== 0) return null;
   const num = parseFloat(String(val).replace(/[,$]/g, ''));
   return isNaN(num) ? null : Math.round(num * 100);
+}
+
+function formatWithCommas(val) {
+  if (!val && val !== '0') return '';
+  const raw = String(val).replace(/[^0-9]/g, '');
+  if (!raw) return '';
+  return Number(raw).toLocaleString('en-US');
+}
+
+function formatEIN(val) {
+  if (!val) return '';
+  const raw = String(val).replace(/[^0-9]/g, '');
+  if (raw.length <= 2) return raw;
+  return raw.slice(0, 2) + '-' + raw.slice(2);
 }
 
 function SectionTitle({ children }) {
@@ -150,11 +157,15 @@ function SectionSubtitle({ children }) {
 }
 
 function DollarField({ label, value, onChange, required, error, helperText, ...props }) {
+  const handleChange = (e) => {
+    const raw = e.target.value.replace(/[^0-9]/g, '');
+    onChange({ target: { value: raw } });
+  };
   return (
     <TextField
       label={label}
-      value={value}
-      onChange={onChange}
+      value={formatWithCommas(value)}
+      onChange={handleChange}
       required={required}
       fullWidth
       error={error}
@@ -187,7 +198,7 @@ function Step1Identity({ formData, setFormData, errors }) {
       <TextField label="Legal Entity Name" value={formData.legal_name} onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })} required fullWidth error={!!errors.legal_name} helperText={errors.legal_name} />
       <TextField label="DBA (Doing Business As)" value={formData.dba} onChange={(e) => setFormData({ ...formData, dba: e.target.value })} fullWidth />
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-        <TextField label="EIN" value={formData.ein} onChange={(e) => setFormData({ ...formData, ein: e.target.value })} placeholder="XX-XXXXXXX" />
+        <TextField label="EIN" value={formatEIN(formData.ein)} onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 9); setFormData({ ...formData, ein: raw }); }} placeholder="XX-XXXXXXX" slotProps={{ htmlInput: { maxLength: 10 } }} />
         <TextField label="Years in Operation" type="number" value={formData.years_in_operation} onChange={(e) => setFormData({ ...formData, years_in_operation: e.target.value })} required error={!!errors.years_in_operation} helperText={errors.years_in_operation} slotProps={{ htmlInput: { min: 0 } }} />
       </Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
@@ -340,10 +351,9 @@ function Step6Fit({ formData, setFormData, errors }) {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       <SectionTitle>Spoonbill Fit</SectionTitle>
       <SectionSubtitle>Tell us about your funding needs and contact information.</SectionSubtitle>
-      <TextField select label="Desired Funding Cadence" value={formData.desired_funding_cadence} onChange={(e) => setFormData({ ...formData, desired_funding_cadence: e.target.value })} fullWidth>
-        <MenuItem value="">Select...</MenuItem>
-        {cadenceOptions.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
-      </TextField>
+      <Box sx={{ p: 1.5, bgcolor: tokens.colors.accent[50], borderRadius: 1, border: '1px solid ' + tokens.colors.accent[200] }}>
+        <Typography variant="body2" sx={{ color: tokens.colors.accent[700], fontWeight: 500 }}>All claims are funded same day.</Typography>
+      </Box>
       <DollarField label="Expected Monthly Funding Volume" value={formData.expected_monthly_funding} onChange={(e) => setFormData({ ...formData, expected_monthly_funding: e.target.value })} />
       <Box>
         <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>Urgency (1 = Low, 5 = Critical)</Typography>
@@ -432,7 +442,6 @@ function ReviewScreen({ formData }) {
     {
       title: 'Spoonbill Fit & Contact',
       items: [
-        ['Funding Cadence', cadenceOptions.find(c => c.value === formData.desired_funding_cadence)?.label || dash],
         ['Expected Monthly Volume', fmtDollar(formData.expected_monthly_funding)],
         ['Urgency', formData.urgency_scale + ' / 5'],
         ['API Integration', fmtYN(formData.willing_to_integrate_api)],
@@ -720,7 +729,7 @@ function ApplicationForm() {
         existing_loc_cents: dollarsToCents(formData.existing_loc),
         monthly_debt_payments_cents: dollarsToCents(formData.monthly_debt_payments),
         missed_loan_payments_24m: formData.missed_loan_payments_24m,
-        desired_funding_cadence: formData.desired_funding_cadence || null,
+        desired_funding_cadence: null,
         expected_monthly_funding_cents: dollarsToCents(formData.expected_monthly_funding),
         urgency_scale: formData.urgency_scale,
         willing_to_integrate_api: formData.willing_to_integrate_api,
@@ -797,7 +806,7 @@ function ApplicationForm() {
               Apply for Spoonbill
             </Typography>
             <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
-              Dental claims financing \u2014 structured underwriting intake.
+              Structured underwriting for dental claims financing.
             </Typography>
 
             {!showReview && (
