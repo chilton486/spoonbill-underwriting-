@@ -202,3 +202,34 @@ class UnderwritingScoreOverride(BaseModel):
     score: float = Field(..., ge=0, le=100)
     grade: str = Field(..., pattern="^(GREEN|YELLOW|RED)$")
     reason: str = Field(..., min_length=1, max_length=500)
+
+
+class PracticeApplicationPatch(BaseModel):
+    legal_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    dba: Optional[str] = Field(None, max_length=255)
+    ein: Optional[str] = Field(None, max_length=20)
+    npi_individual: Optional[str] = Field(None, max_length=20)
+    npi_group: Optional[str] = Field(None, max_length=20)
+    contact_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    contact_email: Optional[EmailStr] = None
+    contact_phone: Optional[str] = Field(None, max_length=50)
+    address: Optional[str] = Field(None, max_length=500)
+    phone: Optional[str] = Field(None, max_length=50)
+    practice_management_software: Optional[str] = Field(None, max_length=100)
+    years_in_operation: Optional[int] = Field(None, ge=0, le=200)
+    ownership_structure: Optional[str] = Field(None, max_length=50)
+    billing_model: Optional[str] = Field(None, max_length=50)
+    gross_production_cents: Optional[int] = Field(None, ge=0)
+    net_collections_cents: Optional[int] = Field(None, ge=0)
+    avg_ar_days: Optional[int] = Field(None, ge=0, le=365)
+
+
+class PracticePatch(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    status: Optional[str] = Field(None, pattern="^(ACTIVE|INACTIVE)$")
+    funding_limit_cents: Optional[int] = Field(None, ge=0)
+
+
+class PracticeUserInviteRequest(BaseModel):
+    email: EmailStr
+    role: str = Field("PRACTICE_MANAGER", pattern="^PRACTICE_MANAGER$")

@@ -344,6 +344,31 @@ export async function overrideUnderwritingScore(applicationId, score, grade, rea
   })
 }
 
+export async function patchApplication(applicationId, data) {
+  return request(`/internal/applications/${applicationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function patchPractice(practiceId, data) {
+  return request(`/ops/practices/${practiceId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function getPracticeUsers(practiceId) {
+  return request(`/ops/practices/${practiceId}/users`)
+}
+
+export async function invitePracticeUser(practiceId, email) {
+  return request(`/ops/practices/${practiceId}/users/invite`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role: 'PRACTICE_MANAGER' })
+  })
+}
+
 // Search API
 export async function searchClaims(query, status = null, practiceId = null) {
   const params = new URLSearchParams()

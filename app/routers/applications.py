@@ -29,6 +29,7 @@ from ..schemas.practice_application import (
     ApplicationApprovalResult,
     ApplicationSubmissionResponse,
     UnderwritingScoreOverride,
+    PracticeApplicationPatch,
 )
 from ..services.audit import AuditService
 from .auth import require_spoonbill_role
@@ -389,12 +390,17 @@ def _approve_application(
     Creates practice, manager user with random password (never shown),
     and generates a one-time invite token for password setup.
     """
-    # Check if email is already in use
     existing_user = db.query(User).filter(User.email == application.contact_email).first()
     if existing_user:
+        existing_practice = db.query(Practice).filter(Practice.id == existing_user.practice_id).first() if existing_user.practice_id else None
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"A user with email {application.contact_email} already exists. Please use a different email or contact support.",
+            detail={
+                "message": f"Email {application.contact_email} is already in use by another practice manager.",
+                "existing_practice_id": existing_user.practice_id,
+                "existing_practice_name": existing_practice.name if existing_practice else None,
+                "recommendation": "Edit the application's contact email before approving.",
+            },
         )
     
     old_status = application.status
@@ -510,6 +516,60 @@ def _approve_application(
         invite_url=invite_url,
         message=f"Application approved. Practice '{practice.name}' created. Share the invite link with the practice manager to set their password.",
     )
+
+
+@router.patch(
+    "/internal/applications/{application_id}",
+)
+def patch_application(
+    application_id: int,
+    patch: PracticeApplicationPatch,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_role),
+):
+    application = db.query(PracticeApplication).filter(
+        PracticeApplication.id == application_id
+    ).first()
+    if not application:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    changes = patch.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+
+    if "contact_email" in changes:
+        new_email = changes["contact_email"]
+        existing_user = db.query(User).filter(User.email == new_email).first()
+        if existing_user:
+            existing_practice = db.query(Practice).filter(Practice.id == existing_user.practice_id).first() if existing_user.practice_id else None
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": f"Email {new_email} is already in use by another practice manager.",
+                    "existing_practice_id": existing_user.practice_id,
+                    "existing_practice_name": existing_practice.name if existing_practice else None,
+                },
+            )
+
+    old_values = {}
+    for field, value in changes.items():
+        old_values[field] = getattr(application, field, None)
+        setattr(application, field, value)
+
+    AuditService.log_event(
+        db,
+        claim_id=None,
+        action="APPLICATION_UPDATED",
+        actor_user_id=current_user.id,
+        metadata={
+            "application_id": application_id,
+            "changes": {k: {"old": old_values.get(k), "new": v} for k, v in changes.items()},
+        },
+    )
+
+    db.commit()
+    db.refresh(application)
+    return application
 
 
 @router.get(

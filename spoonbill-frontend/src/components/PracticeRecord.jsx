@@ -22,7 +22,9 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import BusinessIcon from '@mui/icons-material/Business'
 import { tokens } from '../theme.js'
 
-import { getPracticeCrm, searchClaims } from '../api.js'
+import TextField from '@mui/material/TextField'
+import CircularProgress from '@mui/material/CircularProgress'
+import { getPracticeCrm, searchClaims, patchPractice, getPracticeUsers, invitePracticeUser, reissueInvite } from '../api.js'
 import AgenticOpsPanel from './AgenticOpsPanel.jsx'
 
 const ACTION_LABELS = {
@@ -121,6 +123,267 @@ const CLAIM_STATUS_COLOR = {
   DECLINED: 'error',
   PAYMENT_EXCEPTION: 'error',
 }
+
+
+function PracticeOverviewTab({ practice, practiceId, loading, data, claimCountsByStatus, integrations, timeline, onPracticeUpdated }) {
+  const [editing, setEditing] = React.useState(false)
+  const [editFields, setEditFields] = React.useState({})
+  const [saving, setSaving] = React.useState(false)
+  const [editError, setEditError] = React.useState(null)
+
+  const startEdit = () => {
+    setEditFields({
+      name: practice?.name || '',
+      status: practice?.status || 'ACTIVE',
+      funding_limit_cents: practice?.funding_limit_cents != null ? String(practice.funding_limit_cents) : '',
+    })
+    setEditing(true)
+    setEditError(null)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setEditError(null)
+    try {
+      const patch = {}
+      if (editFields.name !== (practice?.name || '')) patch.name = editFields.name
+      if (editFields.status !== (practice?.status || '')) patch.status = editFields.status
+      const limitVal = editFields.funding_limit_cents === '' ? null : parseInt(editFields.funding_limit_cents, 10)
+      if (limitVal !== practice?.funding_limit_cents) patch.funding_limit_cents = limitVal
+      if (Object.keys(patch).length === 0) { setEditing(false); setSaving(false); return }
+      await patchPractice(practiceId, patch)
+      setEditing(false)
+      onPracticeUpdated()
+    } catch (e) {
+      setEditError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Stack spacing={3}>
+      <Paper sx={{ p: 3 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Practice Details</Typography>
+          {practice && !editing && <Button size="small" variant="outlined" onClick={startEdit}>Edit</Button>}
+        </Stack>
+        {editError && <Alert severity="error" sx={{ mb: 2 }}>{editError}</Alert>}
+        {loading && !data ? (
+          <Stack spacing={1}>
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} variant="text" width={300} />)}
+          </Stack>
+        ) : practice && editing ? (
+          <Stack spacing={2}>
+            <TextField label="Practice Name" size="small" fullWidth value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} />
+            <TextField label="Status" size="small" select fullWidth value={editFields.status} onChange={(e) => setEditFields({...editFields, status: e.target.value})} SelectProps={{ native: true }}>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
+            </TextField>
+            <TextField label="Funding Limit (cents)" size="small" fullWidth type="number" value={editFields.funding_limit_cents} onChange={(e) => setEditFields({...editFields, funding_limit_cents: e.target.value})} />
+            <Stack direction="row" spacing={1}>
+              <Button variant="contained" size="small" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+              <Button size="small" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+            </Stack>
+          </Stack>
+        ) : practice ? (
+          <Stack spacing={1.5}>
+            <Stack direction="row" spacing={8}>
+              <Box>
+                <Typography variant="caption">Practice Name</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>{practice.name}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption">Status</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  <Chip label={practice.status} size="small" color={practice.status === 'ACTIVE' ? 'success' : 'default'} />
+                </Box>
+              </Box>
+              <Box>
+                <Typography variant="caption">Practice ID</Typography>
+                <Typography variant="body1" sx={{ fontFamily: tokens.typography.mono, fontSize: '0.85rem' }}>#{practiceId}</Typography>
+              </Box>
+            </Stack>
+            {practice.created_at && (
+              <Box>
+                <Typography variant="caption">Onboarded</Typography>
+                <Typography variant="body2">{new Date(practice.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Typography>
+              </Box>
+            )}
+          </Stack>
+        ) : null}
+      </Paper>
+
+      {Object.keys(claimCountsByStatus).length > 0 && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Claims by Status</Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            {Object.entries(claimCountsByStatus).map(([st, count]) => (
+              <Chip key={st} label={st.replace(/_/g, ' ') + ': ' + count} size="small" color={CLAIM_STATUS_COLOR[st] || 'default'} variant="outlined" />
+            ))}
+          </Stack>
+        </Paper>
+      )}
+
+      <Stack direction="row" spacing={2}>
+        <Paper sx={{ p: 2, flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Integrations</Typography>
+          {integrations.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No integrations configured</Typography>
+          ) : (
+            <Stack spacing={0.5}>
+              {integrations.map((ic) => (
+                <Stack key={ic.id} direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2">{ic.provider}</Typography>
+                  <Chip label={ic.status} size="small" color={ic.status === 'ACTIVE' ? 'success' : ic.status === 'ERROR' ? 'error' : 'default'} />
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+        <Paper sx={{ p: 2, flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Recent Activity</Typography>
+          {timeline.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No recent activity</Typography>
+          ) : (
+            <Stack spacing={0.5}>
+              {timeline.slice(0, 5).map((event) => (
+                <Stack key={event.id} direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2">{formatAction(event.action)}</Typography>
+                  <Typography variant="caption">{event.created_at ? new Date(event.created_at).toLocaleDateString() : ''}</Typography>
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+      </Stack>
+    </Stack>
+  )
+}
+
+
+function UsersPanel({ practiceId }) {
+  const [users, setUsers] = React.useState([])
+  const [usersLoading, setUsersLoading] = React.useState(true)
+  const [usersError, setUsersError] = React.useState(null)
+  const [inviteEmail, setInviteEmail] = React.useState('')
+  const [inviting, setInviting] = React.useState(false)
+  const [inviteResult, setInviteResult] = React.useState(null)
+  const [inviteError, setInviteError] = React.useState(null)
+  const [reissuing, setReissuing] = React.useState(null)
+
+  const loadUsers = React.useCallback(() => {
+    setUsersLoading(true)
+    setUsersError(null)
+    getPracticeUsers(practiceId).then((d) => {
+      setUsers(d.users || [])
+    }).catch((e) => {
+      setUsersError(e.message)
+    }).finally(() => {
+      setUsersLoading(false)
+    })
+  }, [practiceId])
+
+  React.useEffect(() => { loadUsers() }, [loadUsers])
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    setInviteError(null)
+    setInviteResult(null)
+    try {
+      const result = await invitePracticeUser(practiceId, inviteEmail.trim())
+      setInviteResult(result)
+      setInviteEmail('')
+      loadUsers()
+    } catch (e) {
+      if (e.status === 409) {
+        const detail = e.body?.detail || e.body
+        setInviteError(detail?.message || 'Email already in use by another practice.')
+      } else {
+        setInviteError(e.message)
+      }
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleReissue = async (userId) => {
+    setReissuing(userId)
+    try {
+      const result = await reissueInvite(practiceId, userId)
+      setInviteResult(result)
+      loadUsers()
+    } catch (e) {
+      setInviteError(e.message)
+    } finally {
+      setReissuing(null)
+    }
+  }
+
+  return (
+    <Stack spacing={3}>
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Invite New Practice Manager</Typography>
+        {inviteError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setInviteError(null)}>{inviteError}</Alert>}
+        {inviteResult && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setInviteResult(null)}>
+            <Typography variant="body2" sx={{ mb: 1 }}>Invite sent to {inviteResult.email}</Typography>
+            <Box sx={{ p: 1.5, bgcolor: '#f0fdf4', borderRadius: 1, border: '1px solid #86efac' }}>
+              <Typography variant="caption" sx={{ fontWeight: 600 }}>Invite Link:</Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', mt: 0.5 }}>{inviteResult.invite_url}</Typography>
+              <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={() => navigator.clipboard.writeText(inviteResult.invite_url)}>Copy</Button>
+            </Box>
+          </Alert>
+        )}
+        <Stack direction="row" spacing={1}>
+          <TextField label="Email" size="small" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} sx={{ flex: 1 }} />
+          <Button variant="contained" size="small" onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>{inviting ? 'Inviting...' : 'Invite'}</Button>
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Practice Users</Typography>
+        {usersError && <Alert severity="error" sx={{ mb: 2 }}>{usersError}</Alert>}
+        {usersLoading ? (
+          <CircularProgress size={24} />
+        ) : users.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No users found</Typography>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell>Active</TableCell>
+                  <TableCell>Invite Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>{u.email}</TableCell>
+                    <TableCell><Chip label={u.role} size="small" /></TableCell>
+                    <TableCell><Chip label={u.is_active ? 'Active' : 'Inactive'} size="small" color={u.is_active ? 'success' : 'default'} /></TableCell>
+                    <TableCell>{u.invite_status ? <Chip label={u.invite_status} size="small" color={u.invite_status === 'USED' ? 'success' : u.invite_status === 'PENDING' ? 'warning' : 'error'} variant="outlined" /> : '\u2014'}</TableCell>
+                    <TableCell>
+                      {!u.is_active && (
+                        <Button size="small" variant="outlined" onClick={() => handleReissue(u.id)} disabled={reissuing === u.id}>{reissuing === u.id ? 'Reissuing...' : 'Reissue Invite'}</Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+    </Stack>
+  )
+}
+
 
 export default function PracticeRecord({ practiceId, onBack }) {
   const [data, setData] = React.useState(null)
@@ -246,97 +509,15 @@ export default function PracticeRecord({ practiceId, onBack }) {
             </Stack>
           } />
           <Tab label="Integrations" />
+          <Tab label="Users" />
           <Tab label="Actions" />
         </Tabs>
       </Paper>
 
       {tab === 0 && (
-        <Stack spacing={3}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Practice Details</Typography>
-            {loading && !data ? (
-              <Stack spacing={1}>
-                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} variant="text" width={300} />)}
-              </Stack>
-            ) : practice ? (
-              <Stack spacing={1.5}>
-                <Stack direction="row" spacing={8}>
-                  <Box>
-                    <Typography variant="caption">Practice Name</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>{practice.name}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption">Status</Typography>
-                    <Box sx={{ mt: 0.5 }}>
-                      <Chip label={practice.status} size="small" color={practice.status === 'ACTIVE' ? 'success' : 'default'} />
-                    </Box>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption">Practice ID</Typography>
-                    <Typography variant="body1" sx={{ fontFamily: tokens.typography.mono, fontSize: '0.85rem' }}>#{practiceId}</Typography>
-                  </Box>
-                </Stack>
-                {practice.created_at && (
-                  <Box>
-                    <Typography variant="caption">Onboarded</Typography>
-                    <Typography variant="body2">{new Date(practice.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Typography>
-                  </Box>
-                )}
-              </Stack>
-            ) : null}
-          </Paper>
-
-          {Object.keys(claimCountsByStatus).length > 0 && (
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Claims by Status</Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                {Object.entries(claimCountsByStatus).map(([status, count]) => (
-                  <Chip
-                    key={status}
-                    label={status.replace(/_/g, ' ') + ': ' + count}
-                    size="small"
-                    color={CLAIM_STATUS_COLOR[status] || 'default'}
-                    variant="outlined"
-                  />
-                ))}
-              </Stack>
-            </Paper>
-          )}
-
-          <Stack direction="row" spacing={2}>
-            <Paper sx={{ p: 2, flex: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Integrations</Typography>
-              {integrations.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">No integrations configured</Typography>
-              ) : (
-                <Stack spacing={0.5}>
-                  {integrations.map((ic) => (
-                    <Stack key={ic.id} direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2">{ic.provider}</Typography>
-                      <Chip label={ic.status} size="small" color={ic.status === 'ACTIVE' ? 'success' : ic.status === 'ERROR' ? 'error' : 'default'} />
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Paper>
-            <Paper sx={{ p: 2, flex: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Recent Activity</Typography>
-              {timeline.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">No recent activity</Typography>
-              ) : (
-                <Stack spacing={0.5}>
-                  {timeline.slice(0, 5).map((event) => (
-                    <Stack key={event.id} direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2">{formatAction(event.action)}</Typography>
-                      <Typography variant="caption">{event.created_at ? new Date(event.created_at).toLocaleDateString() : ''}</Typography>
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Paper>
-          </Stack>
-        </Stack>
+        <PracticeOverviewTab practice={practice} practiceId={practiceId} loading={loading} data={data} claimCountsByStatus={claimCountsByStatus} integrations={integrations} timeline={timeline} onPracticeUpdated={loadData} />
       )}
+
 
       {tab === 1 && (
         <Paper sx={{ p: 0 }}>
@@ -532,6 +713,10 @@ export default function PracticeRecord({ practiceId, onBack }) {
       )}
 
       {tab === 4 && (
+        <UsersPanel practiceId={practiceId} />
+      )}
+
+      {tab === 5 && (
         <AgenticOpsPanel practiceId={practiceId} />
       )}
     </Stack>
