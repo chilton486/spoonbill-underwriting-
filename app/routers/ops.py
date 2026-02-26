@@ -1,23 +1,29 @@
 import logging
+import secrets
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..database import get_db
 from ..routers.auth import require_spoonbill_user
-from ..models.user import User
+from ..models.user import User, UserRole
 from ..models.practice import Practice
 from ..models.audit import AuditEvent
 from ..models.claim import Claim, ClaimStatus
 from ..models.payment import PaymentIntent
 from ..models.integration import IntegrationConnection
+from ..models.invite import PracticeManagerInvite
+from ..services.auth import AuthService
 from ..services.economics import EconomicsService
 from ..services.action_proposals import ActionProposalService
 from ..services.control_tower import ControlTowerService
 from ..services.reconciliation import ReconciliationService
 from ..services.playbooks import PlaybookService, PLAYBOOK_TEMPLATES
 from ..services.audit import AuditService
+from ..schemas.practice_application import PracticePatch, PracticeUserInviteRequest
 from sqlalchemy import func, desc
 
 logger = logging.getLogger(__name__)
@@ -203,6 +209,145 @@ def get_practice_crm(
             }
             for c in recent_exceptions
         ],
+    }
+
+
+INVITE_TOKEN_EXPIRY_DAYS = 7
+
+
+@router.patch("/practices/{practice_id}")
+def patch_practice(
+    practice_id: int,
+    patch: PracticePatch,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    practice = db.query(Practice).filter(Practice.id == practice_id).first()
+    if not practice:
+        raise HTTPException(status_code=404, detail="Practice not found")
+
+    changes = patch.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    old_values = {}
+    for field, value in changes.items():
+        old_values[field] = getattr(practice, field, None)
+        setattr(practice, field, value)
+
+    AuditService.log_event(
+        db,
+        claim_id=None,
+        action="PRACTICE_UPDATED",
+        actor_user_id=current_user.id,
+        metadata={
+            "practice_id": practice_id,
+            "changes": {k: {"old": old_values.get(k), "new": v} for k, v in changes.items()},
+        },
+    )
+
+    db.commit()
+    db.refresh(practice)
+    return {
+        "id": practice.id,
+        "name": practice.name,
+        "status": practice.status,
+        "funding_limit_cents": practice.funding_limit_cents,
+        "created_at": practice.created_at.isoformat() if practice.created_at else None,
+    }
+
+
+@router.get("/practices/{practice_id}/users")
+def get_practice_users(
+    practice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    practice = db.query(Practice).filter(Practice.id == practice_id).first()
+    if not practice:
+        raise HTTPException(status_code=404, detail="Practice not found")
+
+    users = db.query(User).filter(User.practice_id == practice_id).all()
+    result = []
+    for u in users:
+        latest_invite = db.query(PracticeManagerInvite).filter(
+            PracticeManagerInvite.user_id == u.id,
+        ).order_by(PracticeManagerInvite.created_at.desc()).first()
+        result.append({
+            "id": u.id,
+            "email": u.email,
+            "role": u.role,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "invite_status": "USED" if (latest_invite and latest_invite.used_at) else "PENDING" if (latest_invite and latest_invite.is_valid) else "EXPIRED" if latest_invite else None,
+        })
+    return {"users": result}
+
+
+@router.post("/practices/{practice_id}/users/invite")
+def invite_practice_user(
+    practice_id: int,
+    invite_req: PracticeUserInviteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_spoonbill_user),
+):
+    practice = db.query(Practice).filter(Practice.id == practice_id).first()
+    if not practice:
+        raise HTTPException(status_code=404, detail="Practice not found")
+
+    existing_user = db.query(User).filter(User.email == invite_req.email).first()
+    if existing_user:
+        existing_practice = db.query(Practice).filter(Practice.id == existing_user.practice_id).first() if existing_user.practice_id else None
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": f"Email {invite_req.email} is already in use.",
+                "existing_practice_id": existing_user.practice_id,
+                "existing_practice_name": existing_practice.name if existing_practice else None,
+            },
+        )
+
+    random_password = secrets.token_urlsafe(32)
+    new_user = User(
+        email=invite_req.email,
+        password_hash=AuthService.get_password_hash(random_password),
+        role=UserRole.PRACTICE_MANAGER.value,
+        practice_id=practice_id,
+        is_active=False,
+    )
+    db.add(new_user)
+    db.flush()
+
+    invite_token = secrets.token_urlsafe(32)
+    invite = PracticeManagerInvite(
+        user_id=new_user.id,
+        token=invite_token,
+        expires_at=datetime.utcnow() + timedelta(days=INVITE_TOKEN_EXPIRY_DAYS),
+    )
+    db.add(invite)
+
+    AuditService.log_event(
+        db,
+        claim_id=None,
+        action="PRACTICE_INVITE_CREATED",
+        actor_user_id=current_user.id,
+        metadata={
+            "practice_id": practice_id,
+            "invited_email": invite_req.email,
+            "user_id": new_user.id,
+        },
+    )
+
+    db.commit()
+
+    settings = get_settings()
+    invite_url = f"{settings.practice_portal_base_url}/#/set-password/{invite_token}"
+
+    return {
+        "user_id": new_user.id,
+        "email": new_user.email,
+        "invite_url": invite_url,
+        "expires_at": invite.expires_at.isoformat(),
     }
 
 

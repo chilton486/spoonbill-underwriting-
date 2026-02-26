@@ -22,7 +22,7 @@ import Stack from '@mui/material/Stack';
 
 import MenuItem from '@mui/material/MenuItem';
 
-import { getApplications, getApplication, reviewApplication, computeUnderwritingScore, overrideUnderwritingScore } from '../api.js';
+import { getApplications, getApplication, reviewApplication, computeUnderwritingScore, overrideUnderwritingScore, patchApplication } from '../api.js';
 
 const gradeColors = {
   GREEN: { bg: '#d1fae5', color: '#065f46' },
@@ -121,12 +121,18 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
   const [approvalResult, setApprovalResult] = React.useState(null);
   const [overrideOpen, setOverrideOpen] = React.useState(false);
   const [recomputing, setRecomputing] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [editFields, setEditFields] = React.useState({});
+  const [saving, setSaving] = React.useState(false);
+  const [conflictInfo, setConflictInfo] = React.useState(null);
 
   React.useEffect(() => {
     if (open && applicationId) {
       setLoading(true);
       setError(null);
       setApprovalResult(null);
+      setEditing(false);
+      setConflictInfo(null);
       getApplication(applicationId)
         .then(setApplication)
         .catch((e) => setError(e.message))
@@ -134,9 +140,51 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
     }
   }, [open, applicationId]);
 
+  const startEdit = () => {
+    setEditFields({
+      legal_name: application.legal_name || '',
+      dba: application.dba || '',
+      contact_name: application.contact_name || '',
+      contact_email: application.contact_email || '',
+      contact_phone: application.contact_phone || '',
+      practice_management_software: application.practice_management_software || '',
+    });
+    setEditing(true);
+    setError(null);
+  };
+
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const patch = {};
+      if (editFields.legal_name !== (application.legal_name || '')) patch.legal_name = editFields.legal_name;
+      if (editFields.dba !== (application.dba || '')) patch.dba = editFields.dba;
+      if (editFields.contact_name !== (application.contact_name || '')) patch.contact_name = editFields.contact_name;
+      if (editFields.contact_email !== (application.contact_email || '')) patch.contact_email = editFields.contact_email;
+      if (editFields.contact_phone !== (application.contact_phone || '')) patch.contact_phone = editFields.contact_phone;
+      if (editFields.practice_management_software !== (application.practice_management_software || '')) patch.practice_management_software = editFields.practice_management_software;
+      if (Object.keys(patch).length === 0) { setEditing(false); setSaving(false); return; }
+      const updated = await patchApplication(applicationId, patch);
+      setApplication(updated);
+      setEditing(false);
+      onReviewComplete();
+    } catch (e) {
+      if (e.status === 409) {
+        const detail = e.body?.detail || e.body;
+        setError(detail?.message || 'Email conflict');
+      } else {
+        setError(e.message);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleReview = async (action) => {
     setSubmitting(true);
     setError(null);
+    setConflictInfo(null);
     try {
       const result = await reviewApplication(applicationId, action, reviewNotes || null);
       if (action === 'APPROVE') {
@@ -146,7 +194,12 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
         onClose();
       }
     } catch (e) {
-      setError(e.message);
+      if (e.status === 409) {
+        const detail = e.body?.detail || e.body;
+        setConflictInfo(detail);
+      } else {
+        setError(e.message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -228,6 +281,18 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
           </Alert>
         )}
         
+        {conflictInfo && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>Duplicate Email Conflict</Typography>
+            <Typography variant="body2">{conflictInfo.message || 'Email already belongs to another practice.'}</Typography>
+            {conflictInfo.existing_practice_name && (
+              <Typography variant="body2" sx={{ mt: 0.5 }}>Existing practice: <strong>{conflictInfo.existing_practice_name}</strong> (ID: {conflictInfo.existing_practice_id})</Typography>
+            )}
+            <Typography variant="body2" sx={{ mt: 1 }}>{conflictInfo.recommendation || 'Edit the contact email on this application before approving.'}</Typography>
+            <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={startEdit}>Edit Application Email</Button>
+          </Alert>
+        )}
+
         {application && !loading && (
           <Stack spacing={3}>
             <Box>
@@ -241,14 +306,9 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
                     fontWeight: 600,
                   }}
                 />
-                <Chip
-                  label={`Urgency: ${application.urgency_level}`}
-                  size="small"
-                  sx={{
-                    bgcolor: urgencyColors[application.urgency_level]?.bg || '#f3f4f6',
-                    color: urgencyColors[application.urgency_level]?.color || '#374151',
-                  }}
-                />
+                {canReview && !editing && (
+                  <Button size="small" variant="outlined" onClick={startEdit}>Edit</Button>
+                )}
               </Stack>
             </Box>
 
@@ -283,18 +343,36 @@ function ApplicationDetailDialog({ open, onClose, applicationId, onReviewComplet
 
             <Divider />
 
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Practice Identity
-              </Typography>
-              <Typography variant="h6">{application.legal_name}</Typography>
-              {application.dba && <Typography variant="body2">DBA: {application.dba}</Typography>}
-              {application.ein && <Typography variant="body2">EIN: {application.ein}</Typography>}
-              <Typography variant="body2">Years in Operation: {application.years_in_operation}</Typography>
-              {application.ownership_structure && <Typography variant="body2">Ownership: {application.ownership_structure.replace(/_/g, ' ')}</Typography>}
-              {application.prior_bankruptcy && <Typography variant="body2" color="error">Prior Bankruptcy: Yes</Typography>}
-              {application.pending_litigation && <Typography variant="body2" color="error">Pending Litigation: Yes</Typography>}
-            </Box>
+            {editing ? (
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>Edit Application</Typography>
+                <Stack spacing={2}>
+                  <TextField label="Legal Name" size="small" fullWidth value={editFields.legal_name} onChange={(e) => setEditFields({...editFields, legal_name: e.target.value})} />
+                  <TextField label="DBA" size="small" fullWidth value={editFields.dba} onChange={(e) => setEditFields({...editFields, dba: e.target.value})} />
+                  <TextField label="Contact Name" size="small" fullWidth value={editFields.contact_name} onChange={(e) => setEditFields({...editFields, contact_name: e.target.value})} />
+                  <TextField label="Contact Email" size="small" fullWidth value={editFields.contact_email} onChange={(e) => setEditFields({...editFields, contact_email: e.target.value})} />
+                  <TextField label="Contact Phone" size="small" fullWidth value={editFields.contact_phone} onChange={(e) => setEditFields({...editFields, contact_phone: e.target.value})} />
+                  <TextField label="PMS Software" size="small" fullWidth value={editFields.practice_management_software} onChange={(e) => setEditFields({...editFields, practice_management_software: e.target.value})} />
+                  <Stack direction="row" spacing={1}>
+                    <Button variant="contained" size="small" onClick={handleSaveEdit} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+                    <Button size="small" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                  </Stack>
+                </Stack>
+              </Box>
+            ) : (
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Practice Identity
+                </Typography>
+                <Typography variant="h6">{application.legal_name}</Typography>
+                {application.dba && <Typography variant="body2">DBA: {application.dba}</Typography>}
+                {application.ein && <Typography variant="body2">EIN: {application.ein}</Typography>}
+                <Typography variant="body2">Years in Operation: {application.years_in_operation}</Typography>
+                {application.ownership_structure && <Typography variant="body2">Ownership: {application.ownership_structure.replace(/_/g, ' ')}</Typography>}
+                {application.prior_bankruptcy && <Typography variant="body2" color="error">Prior Bankruptcy: Yes</Typography>}
+                {application.pending_litigation && <Typography variant="body2" color="error">Pending Litigation: Yes</Typography>}
+              </Box>
+            )}
 
             <Divider />
 
