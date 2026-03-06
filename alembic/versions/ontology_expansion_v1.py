@@ -26,7 +26,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "ontology_expansion_v1"
-down_revision = "ontology_v2"
+down_revision = "intake_revamp_v1"
 branch_labels = None
 depends_on = None
 
