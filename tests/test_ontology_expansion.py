@@ -118,12 +118,12 @@ def _make_claim(db, practice_id, payer_id=None, provider_id=None, amount=50000, 
         payer_id=payer_id,
         provider_id=provider_id,
         patient_name="Test Patient",
-        payer_name="Test Payer",
+        payer="Test Payer",
         amount_cents=amount,
         total_billed_cents=amount,
         total_allowed_cents=int(amount * 0.8),
         status=status,
-        date_of_service=date.today() - timedelta(days=30),
+        procedure_date=date.today() - timedelta(days=30),
         submitted_at=datetime.utcnow() - timedelta(days=28),
         claim_token=Claim.generate_claim_token(),
         fingerprint=f"test-{practice_id}-{Claim.generate_claim_token()}",
@@ -427,7 +427,7 @@ class TestOntologyInsightsService:
 
     def test_claim_cycle_times(self, db):
         practice = _make_practice(db)
-        _make_claim(db, practice.id, status=ClaimStatus.PENDING.value)
+        _make_claim(db, practice.id, status=ClaimStatus.NEEDS_REVIEW.value)
         _make_claim(db, practice.id, status=ClaimStatus.APPROVED.value)
 
         cycle = OntologyInsightsService.get_claim_cycle_times(db, practice.id)
@@ -574,7 +574,7 @@ class TestBackwardCompatibility:
         c = Claim(
             practice_id=practice.id,
             patient_name="Old Claim Patient",
-            payer_name="Old Payer",
+            payer="Old Payer",
             amount_cents=50000,
             status=ClaimStatus.APPROVED.value,
             claim_token=Claim.generate_claim_token(),
@@ -593,9 +593,9 @@ class TestBackwardCompatibility:
         c = Claim(
             practice_id=practice.id,
             patient_name="Nullable FK Patient",
-            payer_name="Some Payer",
+            payer="Some Payer",
             amount_cents=30000,
-            status=ClaimStatus.PENDING.value,
+            status=ClaimStatus.NEW.value,
             claim_token=Claim.generate_claim_token(),
             fingerprint=f"nullable-{Claim.generate_claim_token()}",
         )
@@ -615,7 +615,7 @@ class TestBackwardCompatibility:
             amount_cents=40000,
             status=PaymentIntentStatus.QUEUED.value,
         )
-        pi.idempotency_key = pi.generate_idempotency_key()
+        pi.idempotency_key = PaymentIntent.generate_idempotency_key(claim.id)
         db.add(pi)
         db.flush()
         assert pi.id is not None
@@ -655,7 +655,7 @@ class TestEnums:
 
     def test_claim_line_status_enum(self):
         assert ClaimLineStatus.PENDING.value == "PENDING"
-        assert ClaimLineStatus.PAID.value == "PAID"
+        assert ClaimLineStatus.ADJUDICATED.value == "ADJUDICATED"
         assert ClaimLineStatus.DENIED.value == "DENIED"
 
     def test_funding_decision_type_enum(self):

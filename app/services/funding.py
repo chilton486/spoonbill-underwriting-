@@ -189,7 +189,7 @@ class FundingDecisionService:
             status=PaymentIntentStatus.QUEUED.value,
             queued_at=datetime.utcnow(),
         )
-        pi.idempotency_key = pi.generate_idempotency_key()
+        pi.idempotency_key = PaymentIntent.generate_idempotency_key(claim.id)
         db.add(pi)
         db.flush()
 
