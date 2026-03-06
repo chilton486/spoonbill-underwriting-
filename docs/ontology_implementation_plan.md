@@ -1,81 +1,132 @@
 # Ontology Expansion Implementation Plan
 
-## Audit Summary
+## Status: IMPLEMENTED
 
-### What Already Exists (mapped to 10 target ontology objects)
+All 9 phases have been completed. See below for the original audit and what was delivered.
 
-| # | Target Object | Status | Current Location | Notes |
-|---|---------------|--------|-----------------|-------|
-| 1 | Practice | **Partial** | `app/models/practice.py` | Has id, name, status, funding_limit_cents. Missing: legal_name, dba_name, ein, group_npi, address, pms_type, clearinghouse, owners metadata. PracticeApplication has some of these fields but is a separate onboarding model. |
-| 2 | Provider | **Missing** | — | No provider model exists. Claims don't reference providers. |
-| 3 | Payer | **Missing** | — | Payer is just a string field on Claim (`claim.payer`). Exists as OntologyObjectType but not a first-class table. |
-| 4 | PayerContract | **Missing** | — | No contract model. |
-| 5 | ProcedureCode | **Missing** | — | `procedure_codes` is a comma-separated string on Claim. No dedicated table. |
-| 6 | Claim | **Partial** | `app/models/claim.py` | Has core fields. Missing: payer_id FK, provider_id FK, payer_contract_id FK, total_allowed_cents, total_paid_cents, submitted_at, adjudicated_at, source_system. |
-| 7 | ClaimLine | **Missing** | — | No line-item model. |
-| 8 | FundingDecision | **Partial** | `app/models/underwriting.py` as `UnderwritingDecision` | Has claim_id, decision, reasons, decided_at. Missing: advance_rate, max_advance_amount_cents, fee_rate, risk_score, model_version, policy_version, required_docs_flags. |
-| 9 | PaymentIntent | **Exists** | `app/models/payment.py` | Good shape. Missing: queued_at, failed_at, funding_source_account_ref, destination_account_ref. |
-| 10 | Remittance | **Missing** | — | No Remittance model. ReconciliationService uses ExternalPaymentConfirmation/ExternalBalanceSnapshot instead. |
+---
 
-### Supporting Objects
-- **RemittanceLine**: Missing — required for reconciliation
-- **FeeScheduleItem**: Missing — will add as lightweight child of PayerContract
-- **LedgerEntry/LedgerAccount**: Exists — keep internal, do not expose as ontology object
-- **OntologyObject/OntologyLink/KPIObservation/MetricTimeseries**: Exists — generic graph model, will be supplemented (not replaced) by first-class tables
+## Phase Completion Summary
 
-### Current Ontology System
-- Generic graph-based: OntologyObject + OntologyLink + KPIObservation + MetricTimeseries
-- OntologyBuilderV2 in `services/ontology_v2.py` (1348 lines) builds ontology from Claims and Payments
-- Router at `routers/ontology.py` with endpoints: context, rebuild, brief, cohorts, cfo, risks, graph, retention, reimbursement, rcm
-- Frontend OntologyTab.jsx (887 lines) with CFO 360, retention, reimbursement, RCM ops, relationship explorer, brief panel
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Repo audit and gap analysis | Done |
+| 2 | Database/ORM foundational work | Done |
+| 3 | Service layer / business logic | Done |
+| 4 | API layer | Done |
+| 5 | Ontology tab UI enhancements | Done |
+| 6 | Synthetic data generation | Done |
+| 7 | Model training foundation | Done |
+| 8 | Testing | Done |
+| 9 | Documentation | Done |
 
-### Existing Seed Script
-- `scripts/seed_ontology_demo.py`: Creates 40 claims + payments for one practice
-- Limited: no providers, payers (as objects), contracts, procedure codes, remittances, claim lines
+---
 
-### Conflicts / Issues
-1. `Claim.payer` is a string — need to add `payer_id` FK while keeping string for backward compat
-2. `Claim.procedure_codes` is comma-separated — need ClaimLine + ProcedureCode tables
-3. `UnderwritingDecision` partially overlaps FundingDecision — will refactor in-place (add fields, create alias)
-4. `Claim.amount_cents` maps to `total_billed_cents` — will add alias/new fields
+## Audit Summary (Pre-Implementation)
 
-## Implementation Plan
+### What Already Existed (mapped to 10 target ontology objects)
 
-### Keep (no changes needed)
-- LedgerAccount, LedgerEntry (internal accounting subsystem)
-- AuditEvent (event logging)
-- ClaimDocument (document storage)
-- PracticeApplication (onboarding flow)
-- PracticeManagerInvite (invite flow)
-- IntegrationConnection, IntegrationSyncRun (integration system)
-- OpsTask, ExternalBalanceSnapshot, ExternalPaymentConfirmation (ops tooling)
-- All existing routers, auth patterns, tenant isolation
+| # | Target Object | Pre-Status | Post-Status | Location |
+|---|---------------|------------|-------------|----------|
+| 1 | Practice | Partial | **Complete** | `app/models/practice.py` |
+| 2 | Provider | Missing | **New** | `app/models/provider.py` |
+| 3 | Payer | Missing | **New** | `app/models/payer.py` |
+| 4 | PayerContract | Missing | **New** | `app/models/payer_contract.py` |
+| 5 | ProcedureCode | Missing | **New** | `app/models/procedure_code.py` |
+| 6 | Claim | Partial | **Enhanced** | `app/models/claim.py` |
+| 7 | ClaimLine | Missing | **New** | `app/models/claim_line.py` |
+| 8 | FundingDecision | Partial | **New** | `app/models/funding_decision.py` |
+| 9 | PaymentIntent | Exists | **Enhanced** | `app/models/payment.py` |
+| 10 | Remittance | Missing | **New** | `app/models/remittance.py` |
 
-### Refactor (enhance existing)
-- Practice: add ontology fields (legal_name, dba_name, ein, group_npi, etc.)
-- Claim: add FK columns (payer_id, provider_id, payer_contract_id), add missing fields
-- UnderwritingDecision → FundingDecision: add risk_score, advance_rate, model_version, etc.
-- PaymentIntent: add queued_at, failed_at, account refs
-- OntologyBuilderV2: enhance to use first-class tables alongside generic graph
-- seed_ontology_demo.py: replace with comprehensive synthetic data generator
+### Supporting Objects Delivered
+- **RemittanceLine**: New — `app/models/remittance.py`
+- **FeeScheduleItem**: New — `app/models/fee_schedule.py`
+- **LedgerEntry/LedgerAccount**: Kept internal, not exposed as ontology object
 
-### New to Add
-- Provider model + service + API
-- Payer model + service + API
-- PayerContract model + service + API
-- ProcedureCode model + service + API
-- ClaimLine model + service
-- Remittance + RemittanceLine models + service + API
-- FeeScheduleItem model
-- Synthetic data generation framework (3 practice archetypes)
-- Model training pipeline (feature extraction, baseline models, evaluation)
-- Enhanced ontology UI sections (7 panels)
-- Comprehensive test suite
+---
 
-### Deferred
+## What Was Delivered
+
+### Database Layer (Phase 2)
+- 9 new SQLAlchemy models with proper FKs and indexes
+- Enhanced Practice and Claim models with new fields (all backward-compatible)
+- Alembic migration: `alembic/versions/ontology_expansion_v1.py`
+- Enum definitions for all status/type fields
+
+### Service Layer (Phase 3)
+- `app/services/ontology_crud.py` — CRUD services + OntologyInsightsService (8 aggregation methods)
+- `app/services/funding.py` — FundingDecisionService with rule-based + model-based decisioning
+- `app/services/remittance_reconciliation.py` — ERA ingestion + line-level claim matching
+
+### API Layer (Phase 4)
+- `app/routers/ontology_objects.py` — 15+ endpoints for ontology data and insights
+- Practice-scoped insight endpoints: summary, payer-performance, provider-productivity, procedure-risk, cycle-times, reconciliation, funding-decisions
+- CRUD endpoints: providers, contracts, procedure-codes
+- All endpoints enforce tenant isolation
+
+### Frontend UI (Phase 5)
+- 6 new React panels in `OntologyTab.jsx`:
+  - Practice Overview, Payer Intelligence, Provider Intelligence, Procedure/CDT Intelligence, Claims & Funding, Reconciliation
+- 7-section tabbed navigation with chip-based section switcher
+- 9 new API client functions in `api.js`
+- All panels backed by real API endpoints
+
+### Synthetic Data (Phase 6)
+- `scripts/generate_synthetic_data.py` — generates realistic data for 3 practice archetypes:
+  - Small PPO-heavy general dentist (2 providers, 200 claims)
+  - Multi-provider high-volume practice (5 providers, 600 claims)
+  - Medicaid-heavy practice (3 providers, 400 claims)
+- 30 CDT codes, 10 payers, fee schedules, remittances, funding decisions
+- Deterministic via `--seed`, selectable via `--archetype`
+
+### Model Training (Phase 7)
+- `scripts/train_model.py` — feature extraction + 3 baseline models
+- Logistic Regression, Gradient Boosting, Random Forest
+- 9 engineered features from claim/ontology data
+- Evaluation report with accuracy, F1, AUC, feature importance
+- Model artifact save/load, metadata tracking
+- WARNING: Synthetic-data-trained only, not for production
+
+### Testing (Phase 8)
+- `tests/test_ontology_expansion.py` — 40+ test cases covering:
+  - Model/schema integrity for all new models
+  - Tenant isolation for providers, contracts, insights
+  - Service layer: CRUD, insights, funding, reconciliation
+  - Backward compatibility with existing claim/payment flows
+  - Enum validation
+
+---
+
+## How to Use
+
+### Run Migrations
+```bash
+alembic upgrade head
+```
+
+### Generate Synthetic Data
+```bash
+python scripts/generate_synthetic_data.py --seed 42 --archetype all
+```
+
+### Train Models (requires: `pip install scikit-learn numpy pandas joblib`)
+```bash
+python scripts/train_model.py --output-dir models/
+```
+
+### Run Tests
+```bash
+pytest tests/test_ontology_expansion.py -v
+```
+
+---
+
+## Deferred Items
 - Real banking rails integration
 - Real ERA/835 file parsing
 - Production ML model deployment
 - Internal console ontology inspection pages
 - Import/export tooling for synthetic datasets
 - Notebook-based model analysis reports
+- FeeScheduleItem-driven reimbursement prediction
