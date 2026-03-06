@@ -12,9 +12,19 @@ from .ontology import OntologyObject, OntologyObjectType, OntologyLink, Ontology
 from .integration import IntegrationConnection, IntegrationSyncRun, IntegrationProvider, IntegrationStatus, SyncRunStatus
 from .ops import OpsTask, TaskStatus, PlaybookType, ExternalBalanceSnapshot, ExternalPaymentConfirmation
 
+# Ontology expansion models
+from .provider import Provider, ProviderRole
+from .payer import Payer
+from .payer_contract import PayerContract, NetworkStatus, ContractStatus
+from .procedure_code import ProcedureCode, ProcedureCategory
+from .claim_line import ClaimLine, ClaimLineStatus
+from .funding_decision import FundingDecision, FundingDecisionType
+from .remittance import Remittance, RemittanceLine, PostingStatus, RemittanceSourceType, RemittanceLineMatchStatus
+from .fee_schedule import FeeScheduleItem
+
 __all__ = [
     "User",
-    "UserRole", 
+    "UserRole",
     "Claim",
     "ClaimStatus",
     "UnderwritingDecision",
@@ -40,4 +50,23 @@ __all__ = [
     "BillingModel",
     "UrgencyLevel",
     "PracticeManagerInvite",
+    # Ontology expansion
+    "Provider",
+    "ProviderRole",
+    "Payer",
+    "PayerContract",
+    "NetworkStatus",
+    "ContractStatus",
+    "ProcedureCode",
+    "ProcedureCategory",
+    "ClaimLine",
+    "ClaimLineStatus",
+    "FundingDecision",
+    "FundingDecisionType",
+    "Remittance",
+    "RemittanceLine",
+    "PostingStatus",
+    "RemittanceSourceType",
+    "RemittanceLineMatchStatus",
+    "FeeScheduleItem",
 ]

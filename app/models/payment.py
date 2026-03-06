@@ -13,6 +13,7 @@ class PaymentIntentStatus(str, Enum):
     SENT = "SENT"
     CONFIRMED = "CONFIRMED"
     FAILED = "FAILED"
+    EXCEPTION = "EXCEPTION"
 
 
 class PaymentProvider(str, Enum):
@@ -51,6 +52,10 @@ class PaymentIntent(Base):
     
     sent_at = Column(DateTime, nullable=True)
     confirmed_at = Column(DateTime, nullable=True)
+    queued_at = Column(DateTime, nullable=True)
+    failed_at = Column(DateTime, nullable=True)
+    funding_source_account_ref = Column(String(255), nullable=True)
+    destination_account_ref = Column(String(255), nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

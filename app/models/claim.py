@@ -3,7 +3,7 @@ import base64
 from datetime import datetime, date
 from enum import Enum
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Date, BigInteger, ForeignKey, Boolean, Text
+from sqlalchemy import Column, Integer, String, DateTime, Date, BigInteger, ForeignKey, Boolean, Text, Index
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -41,8 +41,8 @@ class Claim(Base):
     
     practice_id = Column(Integer, ForeignKey("practices.id"), nullable=False, index=True)
     patient_name = Column(String(255), nullable=True)
-    payer = Column(String(255), nullable=False)
-    amount_cents = Column(BigInteger, nullable=False)
+    payer = Column(String(255), nullable=False)  # kept for backward compat
+    amount_cents = Column(BigInteger, nullable=False)  # = total_billed_cents
     procedure_date = Column(Date, nullable=True)
     
     status = Column(String(50), nullable=False, default=ClaimStatus.NEW.value)
@@ -51,7 +51,7 @@ class Claim(Base):
     
     external_claim_id = Column(String(255), nullable=True, index=True)
     external_source = Column(String(50), nullable=True)
-    procedure_codes = Column(String(500), nullable=True)
+    procedure_codes = Column(String(500), nullable=True)  # kept for backward compat
     
     claim_token = Column(String(20), unique=True, index=True, nullable=False)
     
@@ -60,13 +60,39 @@ class Claim(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Ontology expansion FK references (nullable for backward compat)
+    payer_id = Column(Integer, ForeignKey("payers.id"), nullable=True, index=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"), nullable=True, index=True)
+    payer_contract_id = Column(Integer, ForeignKey("payer_contracts.id"), nullable=True, index=True)
+
+    # Additional ontology fields
+    clearinghouse_control_number = Column(String(100), nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    adjudicated_at = Column(DateTime, nullable=True)
+    patient_responsibility_estimate = Column(BigInteger, nullable=True)
+    total_billed_cents = Column(BigInteger, nullable=True)  # mirrors amount_cents
+    total_allowed_cents = Column(BigInteger, nullable=True)
+    total_paid_cents = Column(BigInteger, nullable=True)
+    source_system = Column(String(100), nullable=True)
     
     practice = relationship("Practice", back_populates="claims")
     underwriting_decisions = relationship("UnderwritingDecision", back_populates="claim")
+    funding_decisions = relationship("FundingDecision", back_populates="claim")
     audit_events = relationship("AuditEvent", back_populates="claim")
     documents = relationship("ClaimDocument", back_populates="claim")
     payment_intent = relationship("PaymentIntent", back_populates="claim", uselist=False)
     ledger_entries = relationship("LedgerEntry", back_populates="claim")
+    claim_lines = relationship("ClaimLine", back_populates="claim")
+    remittance_lines = relationship("RemittanceLine", back_populates="claim")
+    payer_ref = relationship("Payer", foreign_keys=[payer_id])
+    provider_ref = relationship("Provider", foreign_keys=[provider_id])
+    payer_contract_ref = relationship("PayerContract", foreign_keys=[payer_contract_id])
+
+    __table_args__ = (
+        Index("idx_claims_payer_id", "payer_id"),
+        Index("idx_claims_status_practice", "status", "practice_id"),
+    )
     
     @staticmethod
     def generate_claim_token() -> str:
