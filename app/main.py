@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
-from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router, internal_practices_router, ontology_router, integrations_router, ops_router, ontology_objects_router
+from .routers import auth_router, claims_router, users_router, practice_router, payments_router, applications_router, internal_practices_router, ontology_router, integrations_router, ops_router, ontology_objects_router, cognitive_router
 from .database import engine, get_db
 from .config import get_settings
 from .utils.migrations import run_migrations_if_enabled, get_migration_state
@@ -56,6 +56,7 @@ app.include_router(ontology_router)
 app.include_router(integrations_router)
 app.include_router(ops_router)
 app.include_router(ontology_objects_router)
+app.include_router(cognitive_router)
 
 
 @app.get("/")

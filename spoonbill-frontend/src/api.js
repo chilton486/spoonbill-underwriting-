@@ -369,6 +369,37 @@ export async function invitePracticeUser(practiceId, email) {
   })
 }
 
+// Cognitive Underwriting API
+export async function getCognitiveStatus() {
+  return request('/api/cognitive/status')
+}
+
+export async function getClaimCognitiveSummary(claimId) {
+  return request(`/api/cognitive/claims/${claimId}/cognitive-summary`)
+}
+
+export async function getClaimUnderwritingRuns(claimId) {
+  return request(`/api/cognitive/claims/${claimId}/runs`)
+}
+
+export async function parseEob(data) {
+  return request('/api/cognitive/parse-eob', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function generateOntologyUpdates(data) {
+  return request('/api/cognitive/ontology-updates', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function getPracticeCognitiveOverview(practiceId) {
+  return request(`/api/cognitive/practices/${practiceId}/cognitive-overview`)
+}
+
 // Search API
 export async function searchClaims(query, status = null, practiceId = null) {
   const params = new URLSearchParams()
