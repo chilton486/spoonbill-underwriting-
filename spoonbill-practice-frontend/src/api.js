@@ -375,6 +375,80 @@ export const runIntegrationSync = async () => {
   return response.json();
 };
 
+// ─── Ontology Expansion API functions ───
+
+export const getPracticeSummary = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/summary`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch practice summary');
+  return response.json();
+};
+
+export const getPayerPerformance = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/payer-performance`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch payer performance');
+  return response.json();
+};
+
+export const getProviderProductivity = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/provider-productivity`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch provider productivity');
+  return response.json();
+};
+
+export const getProcedureRisk = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/procedure-risk`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch procedure risk');
+  return response.json();
+};
+
+export const getClaimCycleTimes = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/cycle-times`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch cycle times');
+  return response.json();
+};
+
+export const getReconciliationSummary = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/reconciliation`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch reconciliation');
+  return response.json();
+};
+
+export const getFundingDecisions = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/ontology/funding-decisions`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch funding decisions');
+  return response.json();
+};
+
+export const listProviders = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/providers`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch providers');
+  return response.json();
+};
+
+export const listPayerContracts = async (practiceId) => {
+  const response = await fetch(`${API_BASE_URL}/practices/${practiceId}/contracts`, {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch contracts');
+  return response.json();
+};
+
 export const validateInviteToken = async (token) => {
   const response = await fetch(`${API_BASE_URL}/public/invites/${token}`);
 

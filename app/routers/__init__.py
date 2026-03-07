@@ -8,5 +8,6 @@ from .internal_practices import router as internal_practices_router
 from .ontology import router as ontology_router
 from .integrations import router as integrations_router
 from .ops import router as ops_router
+from .ontology_objects import router as ontology_objects_router
 
-__all__ = ["auth_router", "claims_router", "users_router", "practice_router", "payments_router", "applications_router", "internal_practices_router", "ontology_router", "integrations_router", "ops_router"]
+__all__ = ["auth_router", "claims_router", "users_router", "practice_router", "payments_router", "applications_router", "internal_practices_router", "ontology_router", "integrations_router", "ops_router", "ontology_objects_router"]

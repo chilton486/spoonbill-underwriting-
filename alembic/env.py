@@ -10,7 +10,7 @@ from alembic import context
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import Base
-from app.models import User, Claim, UnderwritingDecision, AuditEvent
+import app.models  # noqa: F401 - import all models so metadata is populated
 from app.config import get_settings
 
 config = context.config

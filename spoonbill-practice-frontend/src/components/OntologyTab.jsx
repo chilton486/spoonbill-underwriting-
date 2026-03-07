@@ -20,6 +20,9 @@ import {
   getOntologyContext, generateOntologyBrief, adjustPracticeLimit,
   getOntologyCohorts, getCfo360, getOntologyRisks, getOntologyGraph,
   getPatientRetention, getReimbursementMetrics, getRcmOps,
+  getPracticeSummary, getPayerPerformance, getProviderProductivity,
+  getProcedureRisk, getClaimCycleTimes, getReconciliationSummary,
+  getFundingDecisions,
 } from '../api';
 
 const fmt = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -772,6 +775,312 @@ function BriefPanel({ practiceId, brief, onBriefGenerated, onLimitAdjusted }) {
   );
 }
 
+/* ─── Ontology Expansion Panels ─── */
+
+function PracticeOverviewPanel({ summary }) {
+  if (!summary) return null;
+  return (
+    <Card sx={{ mb: 2 }}>
+      <SectionTitle>Practice Overview</SectionTitle>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 1.5, mb: 2 }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{summary.total_claims}</Typography>
+          <Typography variant="caption" color="text.secondary">Total Claims</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{fmt(summary.total_billed_cents || 0)}</Typography>
+          <Typography variant="caption" color="text.secondary">Total Billed</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{fmt(summary.total_funded_cents || 0)}</Typography>
+          <Typography variant="caption" color="text.secondary">Total Funded</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: summary.utilization > 0.85 ? '#dc2626' : '#059669' }}>{summary.utilization != null ? pct(summary.utilization) : 'N/A'}</Typography>
+          <Typography variant="caption" color="text.secondary">Utilization</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{summary.provider_count}</Typography>
+          <Typography variant="caption" color="text.secondary">Providers</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{summary.contract_count}</Typography>
+          <Typography variant="caption" color="text.secondary">Contracts</Typography>
+        </Box>
+      </Box>
+      {summary.payer_mix?.length > 0 && (
+        <Box>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>PAYER MIX</Typography>
+          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+            {summary.payer_mix.map((p, i) => (
+              <Chip key={i} label={`${p.payer}: ${pct(p.share)} (${p.claim_count} claims)`} size="small" sx={{ fontSize: '0.65rem' }} />
+            ))}
+          </Box>
+        </Box>
+      )}
+      {(summary.pms_type || summary.clearinghouse) && (
+        <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+          {summary.pms_type && <Chip label={`PMS: ${summary.pms_type}`} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} />}
+          {summary.clearinghouse && <Chip label={`CH: ${summary.clearinghouse}`} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} />}
+        </Box>
+      )}
+    </Card>
+  );
+}
+
+function PayerIntelligencePanel({ payerPerf }) {
+  if (!payerPerf?.payers) return null;
+  const entries = Object.entries(payerPerf.payers);
+  if (entries.length === 0) return null;
+  return (
+    <Card sx={{ mb: 2 }}>
+      <SectionTitle>Payer Intelligence ({payerPerf.total_payers} payers)</SectionTitle>
+      <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
+        <Box component="thead">
+          <Box component="tr" sx={{ borderBottom: '1px solid #e5e7eb' }}>
+            {['Payer', 'Claims', 'Denial', 'Realized', 'Avg Cycle', 'P90 Cycle'].map(h => (
+              <Box key={h} component="th" sx={{ textAlign: h === 'Payer' ? 'left' : 'right', py: 0.5, fontSize: '0.7rem', color: '#6b7280' }}>{h}</Box>
+            ))}
+          </Box>
+        </Box>
+        <Box component="tbody">
+          {entries.map(([payer, d]) => (
+            <Box component="tr" key={payer} sx={{ borderBottom: '1px solid #f3f4f6' }}>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', fontWeight: 500 }}>{payer}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{d.total_claims}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right', color: d.denial_rate > 0.1 ? '#dc2626' : 'inherit' }}>{pct(d.denial_rate)}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right', color: d.realized_rate != null && d.realized_rate < 0.5 ? '#dc2626' : '#059669' }}>{d.realized_rate != null ? pct(d.realized_rate) : 'N/A'}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{d.avg_cycle_days != null ? `${d.avg_cycle_days}d` : 'N/A'}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{d.p90_cycle_days != null ? `${d.p90_cycle_days}d` : 'N/A'}</Box>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </Card>
+  );
+}
+
+function ProviderIntelligencePanel({ providerData }) {
+  if (!providerData?.providers?.length) return null;
+  return (
+    <Card sx={{ mb: 2 }}>
+      <SectionTitle>Provider Intelligence ({providerData.providers.length} providers)</SectionTitle>
+      <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
+        <Box component="thead">
+          <Box component="tr" sx={{ borderBottom: '1px solid #e5e7eb' }}>
+            {['Provider', 'Role', 'Claims', 'Billed', 'Top Procedures'].map(h => (
+              <Box key={h} component="th" sx={{ textAlign: h === 'Provider' || h === 'Role' || h === 'Top Procedures' ? 'left' : 'right', py: 0.5, fontSize: '0.7rem', color: '#6b7280' }}>{h}</Box>
+            ))}
+          </Box>
+        </Box>
+        <Box component="tbody">
+          {providerData.providers.map((p) => (
+            <Box component="tr" key={p.id} sx={{ borderBottom: '1px solid #f3f4f6' }}>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', fontWeight: 500 }}>{p.full_name}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem' }}>
+                <Chip label={p.role} size="small" sx={{ fontSize: '0.6rem', height: 18 }} />
+              </Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{p.claim_count}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{fmt(p.total_billed_cents || 0)}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem' }}>
+                {p.top_procedures?.map((tp, i) => (
+                  <Chip key={i} label={`${tp.code} (${tp.count})`} size="small" variant="outlined" sx={{ fontSize: '0.6rem', height: 18, mr: 0.3 }} />
+                ))}
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </Card>
+  );
+}
+
+function ProcedureRiskPanel({ procedureRisk }) {
+  if (!procedureRisk?.procedures) return null;
+  const entries = Object.entries(procedureRisk.procedures).sort((a, b) => b[1].count - a[1].count).slice(0, 15);
+  if (entries.length === 0) return null;
+
+  return (
+    <Card sx={{ mb: 2 }}>
+      <SectionTitle>Procedure / CDT Intelligence</SectionTitle>
+      {procedureRisk.categories && Object.keys(procedureRisk.categories).length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>BY CATEGORY</Typography>
+          <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+            {Object.entries(procedureRisk.categories).map(([cat, d]) => (
+              <Card key={cat} sx={{ p: 1, minWidth: 100, textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>{cat}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>{d.count} lines</Typography>
+                <Typography variant="caption" color="text.secondary">Denial: {pct(d.denial_rate)}</Typography>
+              </Card>
+            ))}
+          </Box>
+        </Box>
+      )}
+      <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>TOP PROCEDURES</Typography>
+      <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', mt: 0.5 }}>
+        <Box component="thead">
+          <Box component="tr" sx={{ borderBottom: '1px solid #e5e7eb' }}>
+            {['Code', 'Description', 'Count', 'Denial', 'Avg Billed'].map(h => (
+              <Box key={h} component="th" sx={{ textAlign: h === 'Code' || h === 'Description' ? 'left' : 'right', py: 0.5, fontSize: '0.7rem', color: '#6b7280' }}>{h}</Box>
+            ))}
+          </Box>
+        </Box>
+        <Box component="tbody">
+          {entries.map(([code, d]) => (
+            <Box component="tr" key={code} sx={{ borderBottom: '1px solid #f3f4f6' }}>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', fontWeight: 600 }}>{d.cdt_code}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.75rem', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.description || '--'}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{d.count}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right', color: d.denial_rate > 0.1 ? '#dc2626' : 'inherit' }}>{pct(d.denial_rate)}</Box>
+              <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{fmt(d.avg_billed_cents || 0)}</Box>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </Card>
+  );
+}
+
+function ClaimsFundingPanel({ cycleTimes, fundingDecisions }) {
+  return (
+    <Card sx={{ mb: 2 }}>
+      <SectionTitle>Claims & Funding</SectionTitle>
+      {cycleTimes && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>CLAIM CYCLE TIMES</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 1, mt: 0.5 }}>
+            <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f9fafb', borderRadius: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>{cycleTimes.open_claims}</Typography>
+              <Typography variant="caption" color="text.secondary">Open Claims</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f9fafb', borderRadius: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>{cycleTimes.avg_cycle_days != null ? `${cycleTimes.avg_cycle_days}d` : 'N/A'}</Typography>
+              <Typography variant="caption" color="text.secondary">Avg Cycle</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f9fafb', borderRadius: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>{cycleTimes.p50_cycle_days != null ? `${cycleTimes.p50_cycle_days}d` : 'N/A'}</Typography>
+              <Typography variant="caption" color="text.secondary">P50 Cycle</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f9fafb', borderRadius: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: cycleTimes.p90_cycle_days > 60 ? '#dc2626' : 'inherit' }}>{cycleTimes.p90_cycle_days != null ? `${cycleTimes.p90_cycle_days}d` : 'N/A'}</Typography>
+              <Typography variant="caption" color="text.secondary">P90 Cycle</Typography>
+            </Box>
+          </Box>
+          {cycleTimes.aging_buckets && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, mt: 1 }}>
+              {[['0-30d', cycleTimes.aging_buckets['0_30']], ['30-60d', cycleTimes.aging_buckets['30_60']], ['60-90d', cycleTimes.aging_buckets['60_90']], ['90+d', cycleTimes.aging_buckets['90_plus']]].map(([label, count]) => (
+                <Box key={label} sx={{ textAlign: 'center', p: 0.5, bgcolor: label === '90+d' && count > 0 ? '#fef2f2' : '#f9fafb', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{count || 0}</Typography>
+                  <Typography variant="caption" color="text.secondary">{label}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+      )}
+      {fundingDecisions && (
+        <Box>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>FUNDING DECISIONS ({fundingDecisions.total_decisions} total)</Typography>
+          <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+            {Object.entries(fundingDecisions.decision_counts || {}).map(([decision, count]) => (
+              <Chip key={decision} label={`${decision}: ${count}`} size="small" sx={{
+                fontSize: '0.65rem', fontWeight: 600,
+                bgcolor: decision === 'APPROVE' ? '#dcfce7' : decision === 'DENY' ? '#fee2e2' : '#fef3c7',
+                color: decision === 'APPROVE' ? '#166534' : decision === 'DENY' ? '#991b1b' : '#92400e',
+              }} />
+            ))}
+          </Box>
+          {fundingDecisions.avg_risk_score != null && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              Avg Risk Score: {(fundingDecisions.avg_risk_score * 100).toFixed(1)}%
+            </Typography>
+          )}
+          {fundingDecisions.recent_decisions?.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>RECENT</Typography>
+              {fundingDecisions.recent_decisions.slice(0, 5).map((fd) => (
+                <Box key={fd.id} sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.3 }}>
+                  <Chip label={fd.decision} size="small" sx={{
+                    fontSize: '0.6rem', height: 18,
+                    bgcolor: fd.decision === 'APPROVE' ? '#dcfce7' : fd.decision === 'DENY' ? '#fee2e2' : '#fef3c7',
+                    color: fd.decision === 'APPROVE' ? '#166534' : fd.decision === 'DENY' ? '#991b1b' : '#92400e',
+                  }} />
+                  <Typography variant="caption">Claim #{fd.claim_id}</Typography>
+                  {fd.risk_score != null && <Typography variant="caption" color="text.secondary">Risk: {(fd.risk_score * 100).toFixed(0)}%</Typography>}
+                  {fd.advance_rate != null && <Typography variant="caption" color="text.secondary">Adv: {pct(fd.advance_rate)}</Typography>}
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+      )}
+    </Card>
+  );
+}
+
+function ReconciliationPanel({ reconciliation }) {
+  if (!reconciliation) return null;
+  return (
+    <Card sx={{ mb: 2 }}>
+      <SectionTitle>Reconciliation</SectionTitle>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 1.5, mb: 2 }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{reconciliation.total_remittances}</Typography>
+          <Typography variant="caption" color="text.secondary">Remittances</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{fmt(reconciliation.total_paid_cents || 0)}</Typography>
+          <Typography variant="caption" color="text.secondary">Total Paid</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#059669' }}>{reconciliation.match_rate != null ? pct(reconciliation.match_rate) : 'N/A'}</Typography>
+          <Typography variant="caption" color="text.secondary">Match Rate</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: reconciliation.unmatched_lines > 0 ? '#d97706' : 'inherit' }}>{reconciliation.unmatched_lines}</Typography>
+          <Typography variant="caption" color="text.secondary">Unmatched</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: reconciliation.mismatch_lines > 0 ? '#dc2626' : 'inherit' }}>{reconciliation.mismatch_lines}</Typography>
+          <Typography variant="caption" color="text.secondary">Mismatches</Typography>
+        </Box>
+      </Box>
+      {reconciliation.recent_remittances?.length > 0 && (
+        <Box>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>RECENT REMITTANCES</Typography>
+          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', mt: 0.5 }}>
+            <Box component="thead">
+              <Box component="tr" sx={{ borderBottom: '1px solid #e5e7eb' }}>
+                {['Payer', 'Date', 'Paid', 'Adjustments', 'Status'].map(h => (
+                  <Box key={h} component="th" sx={{ textAlign: h === 'Payer' || h === 'Status' ? 'left' : 'right', py: 0.5, fontSize: '0.7rem', color: '#6b7280' }}>{h}</Box>
+                ))}
+              </Box>
+            </Box>
+            <Box component="tbody">
+              {reconciliation.recent_remittances.map((r) => (
+                <Box component="tr" key={r.id} sx={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem' }}>{r.payer_name || 'Unknown'}</Box>
+                  <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{r.payment_date || 'N/A'}</Box>
+                  <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{fmt(r.total_paid_cents || 0)}</Box>
+                  <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem', textAlign: 'right' }}>{fmt(r.total_adjustments_cents || 0)}</Box>
+                  <Box component="td" sx={{ py: 0.5, fontSize: '0.8rem' }}>
+                    <Chip label={r.posting_status} size="small" sx={{
+                      fontSize: '0.6rem', height: 18,
+                      bgcolor: r.posting_status === 'POSTED' ? '#dcfce7' : r.posting_status === 'EXCEPTION' ? '#fee2e2' : '#f3f4f6',
+                      color: r.posting_status === 'POSTED' ? '#166534' : r.posting_status === 'EXCEPTION' ? '#991b1b' : '#374151',
+                    }} />
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      )}
+    </Card>
+  );
+}
+
 export default function OntologyTab({ practiceId }) {
   const [cfo, setCfo] = useState(null);
   const [retention, setRetention] = useState(null);
@@ -783,19 +1092,37 @@ export default function OntologyTab({ practiceId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [errorStatus, setErrorStatus] = useState(null);
+  // Ontology expansion state
+  const [summary, setSummary] = useState(null);
+  const [payerPerf, setPayerPerf] = useState(null);
+  const [providerProd, setProviderProd] = useState(null);
+  const [procedureRisk, setProcedureRisk] = useState(null);
+  const [cycleTimes, setCycleTimes] = useState(null);
+  const [reconciliation, setReconciliation] = useState(null);
+  const [fundingDecisions, setFundingDecisions] = useState(null);
+  const [activeSection, setActiveSection] = useState('overview');
 
   const fetchAll = async () => {
     setLoading(true);
     setError(null);
     setErrorStatus(null);
     try {
-      const [cfoData, retentionData, reimbursementData, rcmData, riskData, graphData] = await Promise.all([
+      const [cfoData, retentionData, reimbursementData, rcmData, riskData, graphData,
+             summaryData, payerData, providerData, procData, cycleData, reconData, fundingData
+      ] = await Promise.all([
         getCfo360(practiceId).catch(() => null),
         getPatientRetention(practiceId).catch(() => null),
         getReimbursementMetrics(practiceId).catch(() => null),
         getRcmOps(practiceId).catch(() => null),
         getOntologyRisks(practiceId).catch(() => null),
         getOntologyGraph(practiceId).catch(() => null),
+        getPracticeSummary(practiceId).catch(() => null),
+        getPayerPerformance(practiceId).catch(() => null),
+        getProviderProductivity(practiceId).catch(() => null),
+        getProcedureRisk(practiceId).catch(() => null),
+        getClaimCycleTimes(practiceId).catch(() => null),
+        getReconciliationSummary(practiceId).catch(() => null),
+        getFundingDecisions(practiceId).catch(() => null),
       ]);
       setCfo(cfoData);
       setRetention(retentionData);
@@ -803,6 +1130,13 @@ export default function OntologyTab({ practiceId }) {
       setRcm(rcmData);
       setRisks(riskData);
       setGraph(graphData);
+      setSummary(summaryData);
+      setPayerPerf(payerData);
+      setProviderProd(providerData);
+      setProcedureRisk(procData);
+      setCycleTimes(cycleData);
+      setReconciliation(reconData);
+      setFundingDecisions(fundingData);
     } catch (err) {
       if (err.message?.includes('401') || err.message?.includes('Session expired')) setErrorStatus(401);
       else if (err.message?.includes('404')) setErrorStatus(404);
@@ -834,53 +1168,103 @@ export default function OntologyTab({ practiceId }) {
   const riskSeverityColors = { high: '#dc2626', medium: '#d97706', low: '#059669' };
   const riskSeverityBg = { high: '#fef2f2', medium: '#fffbeb', low: '#f0fdf4' };
 
+  const sections = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'payers', label: 'Payer Intel' },
+    { key: 'providers', label: 'Provider Intel' },
+    { key: 'procedures', label: 'CDT Intel' },
+    { key: 'claims', label: 'Claims & Funding' },
+    { key: 'reconciliation', label: 'Reconciliation' },
+    { key: 'graph', label: 'Relationships' },
+  ];
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
           Practice Intelligence
-          <Chip label="ontology-v2.1" size="small" sx={{ ml: 1, fontSize: '0.7rem' }} />
+          <Chip label="ontology-v3" size="small" sx={{ ml: 1, fontSize: '0.7rem' }} />
         </Typography>
         <Button variant="text" size="small" onClick={fetchAll} sx={{ textTransform: 'none' }}>Refresh</Button>
       </Box>
 
-      <Cfo360Panels cfo={cfo} prevCfo={null} />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-        <RetentionPanel retention={retention} />
-        <ReimbursementPanel reimbursement={reimbursement} />
+      {/* Section Navigation */}
+      <Box sx={{ display: 'flex', gap: 0.5, mb: 2, flexWrap: 'wrap' }}>
+        {sections.map((s) => (
+          <Chip
+            key={s.key}
+            label={s.label}
+            onClick={() => setActiveSection(s.key)}
+            variant={activeSection === s.key ? 'filled' : 'outlined'}
+            color={activeSection === s.key ? 'primary' : 'default'}
+            size="small"
+            sx={{ fontSize: '0.75rem', cursor: 'pointer' }}
+          />
+        ))}
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-        <RcmOpsPanel rcm={rcm} />
-        {risks && risks.length > 0 ? (
-          <Card sx={{ mb: 2, border: risks.some(r => r.severity === 'high') ? '1px solid #fca5a5' : '1px solid #e5e7eb' }}>
-            <SectionTitle>Risk Intelligence ({risks.length} signals)</SectionTitle>
-            {risks.map((r, i) => (
-              <Box key={i} sx={{ p: 1, mb: 0.5, bgcolor: riskSeverityBg[r.severity] || '#f9fafb', borderRadius: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
-                  <Chip label={r.severity?.toUpperCase()} size="small" sx={{ bgcolor: (riskSeverityColors[r.severity] || '#6b7280') + '20', color: riskSeverityColors[r.severity] || '#6b7280', fontWeight: 700, fontSize: '0.65rem', height: 20 }} />
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{r.type}</Typography>
+      {/* Section: Overview */}
+      {activeSection === 'overview' && (
+        <>
+          <PracticeOverviewPanel summary={summary} />
+          <Cfo360Panels cfo={cfo} prevCfo={null} />
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
+            <RetentionPanel retention={retention} />
+            <RcmOpsPanel rcm={rcm} />
+          </Box>
+          {risks && risks.length > 0 && (
+            <Card sx={{ mb: 2, border: risks.some(r => r.severity === 'high') ? '1px solid #fca5a5' : '1px solid #e5e7eb' }}>
+              <SectionTitle>Risk Intelligence ({risks.length} signals)</SectionTitle>
+              {risks.map((r, i) => (
+                <Box key={i} sx={{ p: 1, mb: 0.5, bgcolor: riskSeverityBg[r.severity] || '#f9fafb', borderRadius: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
+                    <Chip label={r.severity?.toUpperCase()} size="small" sx={{ bgcolor: (riskSeverityColors[r.severity] || '#6b7280') + '20', color: riskSeverityColors[r.severity] || '#6b7280', fontWeight: 700, fontSize: '0.65rem', height: 20 }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{r.type}</Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ fontSize: '0.8rem', color: '#374151' }}>{r.explanation}</Typography>
                 </Box>
-                <Typography variant="body2" sx={{ fontSize: '0.8rem', color: '#374151' }}>{r.explanation}</Typography>
-              </Box>
-            ))}
-          </Card>
-        ) : (
-          <Card sx={{ mb: 2 }}>
-            <SectionTitle>Risk Intelligence</SectionTitle>
-            <Typography variant="body2" color="text.secondary">No active risk signals detected.</Typography>
-          </Card>
-        )}
-      </Box>
+              ))}
+            </Card>
+          )}
+        </>
+      )}
 
-      <Divider sx={{ my: 2 }} />
+      {/* Section: Payer Intelligence */}
+      {activeSection === 'payers' && (
+        <>
+          <PayerIntelligencePanel payerPerf={payerPerf} />
+          <ReimbursementPanel reimbursement={reimbursement} />
+        </>
+      )}
 
-      <RelationshipExplorer practiceId={practiceId} initialGraph={graph} />
+      {/* Section: Provider Intelligence */}
+      {activeSection === 'providers' && (
+        <ProviderIntelligencePanel providerData={providerProd} />
+      )}
 
-      <Divider sx={{ my: 2 }} />
+      {/* Section: Procedure / CDT Intelligence */}
+      {activeSection === 'procedures' && (
+        <ProcedureRiskPanel procedureRisk={procedureRisk} />
+      )}
 
-      <BriefPanel practiceId={practiceId} brief={brief} onBriefGenerated={(b) => setBrief(b)} onLimitAdjusted={() => fetchAll()} />
+      {/* Section: Claims & Funding */}
+      {activeSection === 'claims' && (
+        <ClaimsFundingPanel cycleTimes={cycleTimes} fundingDecisions={fundingDecisions} />
+      )}
+
+      {/* Section: Reconciliation */}
+      {activeSection === 'reconciliation' && (
+        <ReconciliationPanel reconciliation={reconciliation} />
+      )}
+
+      {/* Section: Relationships */}
+      {activeSection === 'graph' && (
+        <>
+          <RelationshipExplorer practiceId={practiceId} initialGraph={graph} />
+          <Divider sx={{ my: 2 }} />
+          <BriefPanel practiceId={practiceId} brief={brief} onBriefGenerated={(b) => setBrief(b)} onLimitAdjusted={() => fetchAll()} />
+        </>
+      )}
     </Box>
   );
 }
