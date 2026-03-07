@@ -21,6 +21,7 @@ from .claim_line import ClaimLine, ClaimLineStatus
 from .funding_decision import FundingDecision, FundingDecisionType
 from .remittance import Remittance, RemittanceLine, PostingStatus, RemittanceSourceType, RemittanceLineMatchStatus
 from .fee_schedule import FeeScheduleItem
+from .underwriting_run import UnderwritingRun
 
 __all__ = [
     "User",

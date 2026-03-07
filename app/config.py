@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     # LLM (OpenAI) for ontology briefs
     openai_api_key: str = ""
 
+    # Anthropic cognitive underwriting
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_enabled: bool = False
+    anthropic_timeout_seconds: int = 30
+    anthropic_max_retries: int = 2
+    anthropic_prompt_version: str = "v1"
+
+    # Cognitive feature flags
+    cognitive_underwriting_enabled: bool = False
+    cognitive_eob_parsing_enabled: bool = False
+    cognitive_ontology_updates_enabled: bool = False
+
     # Auto-run alembic migrations on startup (set to "true" in staging)
     run_migrations_on_startup: str = ""
     

@@ -11,8 +11,12 @@ from ..models.practice import Practice
 from ..schemas.claim import ClaimCreate, ClaimUpdate, ClaimResponse, ClaimListResponse, ClaimTransitionRequest
 from ..services.audit import AuditService
 from ..services.underwriting import UnderwritingService
+from ..services.cognitive_underwriting import CognitiveUnderwritingService
 from ..state_machine import validate_status_transition, get_valid_transitions, InvalidStatusTransitionError
 from .auth import get_current_user, require_spoonbill_user
+
+import logging
+_logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/claims", tags=["claims"])
 
@@ -56,16 +60,59 @@ def create_claim(
     user_id = current_user.id if current_user else None
     AuditService.log_claim_created(db, claim, actor_user_id=user_id)
     
+    # Layer 1: Deterministic underwriting (existing rules)
     decision, reasons = UnderwritingService.run_underwriting(db, claim, user_id=user_id)
     AuditService.log_underwriting_decision(db, claim, decision.value, reasons, actor_user_id=user_id)
-    
-    target_status = UnderwritingService.get_target_status(decision)
+
+    # Layer 2: Cognitive underwriting augmentation (Anthropic)
+    cognitive_output = None
+    underwriting_run = None
+    final_decision = decision
+    try:
+        cognitive_output, underwriting_run = CognitiveUnderwritingService.run_cognitive_layer(
+            db, claim, decision.value, reasons, user_id=user_id,
+        )
+        if cognitive_output is not None:
+            merged = CognitiveUnderwritingService.merge_decisions(
+                decision.value, cognitive_output,
+            )
+            from ..models.underwriting import DecisionType
+            try:
+                final_decision = DecisionType(merged)
+            except ValueError:
+                final_decision = decision
+            AuditService.log_event(
+                db, claim.id, "COGNITIVE_UNDERWRITING",
+                actor_user_id=user_id,
+                metadata={
+                    "deterministic_decision": decision.value,
+                    "cognitive_recommendation": cognitive_output.recommendation.value,
+                    "merged_decision": merged,
+                    "risk_score": cognitive_output.risk_score,
+                    "confidence_score": cognitive_output.confidence_score,
+                    "rationale_summary": cognitive_output.rationale_summary,
+                    "fallback_used": False,
+                },
+            )
+        elif underwriting_run and underwriting_run.fallback_used:
+            AuditService.log_event(
+                db, claim.id, "COGNITIVE_UNDERWRITING_FALLBACK",
+                actor_user_id=user_id,
+                metadata={
+                    "fallback_reason": underwriting_run.fallback_reason,
+                    "deterministic_decision": decision.value,
+                },
+            )
+    except Exception as e:
+        _logger.error("Cognitive underwriting error for claim %s: %s", claim.id, e)
+
+    target_status = UnderwritingService.get_target_status(final_decision)
     old_status = ClaimStatus(claim.status)
     claim.status = target_status.value
     AuditService.log_status_change(
         db, claim, old_status, target_status,
         actor_user_id=user_id,
-        reason=f"Underwriting decision: {decision.value}",
+        reason=f"Underwriting decision: {final_decision.value}",
     )
     
     db.commit()
